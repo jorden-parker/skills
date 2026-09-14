@@ -1,0 +1,21 @@
+--- install
++++ install
+@@ -93,13 +93,14 @@
+                | if (.skillOverrides | length) == 0 then del(.skillOverrides) else . end' \
+         "$SETTINGS" - > "$SETTINGS.tmp"
+   else
+-    printf '%s\n' "$pairs" | python3 - "$SETTINGS" "$SETTINGS.tmp" <<'PY'
++    # The script arrives on stdin via the heredoc, so the pairs cannot also
++    # come through stdin. Pass them as an argument instead.
++    python3 - "$SETTINGS" "$SETTINGS.tmp" "$pairs" <<'PY'
+ import json,sys
+-settings,out=sys.argv[1],sys.argv[2]
++settings,out,pairs=sys.argv[1],sys.argv[2],sys.argv[3]
+ d=json.load(open(settings))
+ ov=d.get("skillOverrides") or {}
+-for line in sys.stdin:
+-    line=line.rstrip("\n")
++for line in pairs.split("\n"):
+     if not line: continue
+     k,_,v=line.partition("\t")
+     ov[k]=v

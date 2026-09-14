@@ -1,0 +1,195 @@
+/* Geist type scale. Class names and values match vercel.com/geist/typography
+ * (computed from the live page). Pair with geist-tokens.css.
+ *
+ * Four families:
+ *   heading  - display and section titles. 600 weight, negative tracking.
+ *   copy     - body prose. 400 weight, generous line-height.
+ *   label    - UI text, table cells, captions. 400 weight, tight line-height.
+ *   button   - interactive control text. 500 weight.
+ * The number is the font-size in px.
+ */
+
+:root {
+  font-family: var(--ds-font-sans);
+}
+
+code,
+pre,
+kbd,
+samp,
+.font-mono {
+  font-family: var(--ds-font-mono);
+}
+
+/* Headings */
+.text-heading-72 {
+  font-size: 72px;
+  line-height: 72px;
+  letter-spacing: -4.32px;
+  font-weight: 600;
+}
+.text-heading-64 {
+  font-size: 64px;
+  line-height: 64px;
+  letter-spacing: -3.84px;
+  font-weight: 600;
+}
+.text-heading-56 {
+  font-size: 56px;
+  line-height: 56px;
+  letter-spacing: -3.36px;
+  font-weight: 600;
+}
+.text-heading-48 {
+  font-size: 48px;
+  line-height: 56px;
+  letter-spacing: -2.88px;
+  font-weight: 600;
+}
+.text-heading-40 {
+  font-size: 40px;
+  line-height: 48px;
+  letter-spacing: -2.4px;
+  font-weight: 600;
+}
+.text-heading-32 {
+  font-size: 32px;
+  line-height: 40px;
+  letter-spacing: -1.28px;
+  font-weight: 600;
+}
+.text-heading-24 {
+  font-size: 24px;
+  line-height: 32px;
+  letter-spacing: -0.96px;
+  font-weight: 600;
+}
+.text-heading-20 {
+  font-size: 20px;
+  line-height: 26px;
+  letter-spacing: -0.4px;
+  font-weight: 600;
+}
+.text-heading-16 {
+  font-size: 16px;
+  line-height: 24px;
+  letter-spacing: -0.32px;
+  font-weight: 600;
+}
+.text-heading-14 {
+  font-size: 14px;
+  line-height: 20px;
+  letter-spacing: -0.28px;
+  font-weight: 600;
+}
+
+/* Body copy */
+.text-copy-24 {
+  font-size: 24px;
+  line-height: 36px;
+  font-weight: 400;
+}
+.text-copy-20 {
+  font-size: 20px;
+  line-height: 36px;
+  font-weight: 400;
+}
+.text-copy-18 {
+  font-size: 18px;
+  line-height: 28px;
+  font-weight: 400;
+}
+.text-copy-16 {
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 400;
+}
+.text-copy-14 {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+}
+.text-copy-13 {
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 400;
+}
+
+/* UI labels */
+.text-label-20 {
+  font-size: 20px;
+  line-height: 32px;
+  font-weight: 400;
+}
+.text-label-18 {
+  font-size: 18px;
+  line-height: 20px;
+  font-weight: 400;
+}
+.text-label-16 {
+  font-size: 16px;
+  line-height: 20px;
+  font-weight: 400;
+}
+.text-label-14 {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+}
+.text-label-13 {
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 400;
+}
+.text-label-12 {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 400;
+}
+
+.text-label-14-mono {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+  font-family: var(--ds-font-mono);
+}
+.text-label-13-mono {
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 400;
+  font-family: var(--ds-font-mono);
+}
+.text-label-12-mono {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 400;
+  font-family: var(--ds-font-mono);
+}
+
+/* Controls */
+.text-button-16 {
+  font-size: 16px;
+  line-height: 20px;
+  font-weight: 500;
+}
+.text-button-14 {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+}
+.text-button-12 {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+}
+
+/* "Strong" variants bump weight without changing metrics. */
+.text-copy-24-strong,
+.text-copy-20-strong,
+.text-copy-18-strong,
+.text-copy-16-strong,
+.text-copy-14-strong,
+.text-label-16-strong,
+.text-label-14-strong {
+  font-weight: 500;
+}

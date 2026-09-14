@@ -1,0 +1,21 @@
+{
+  "name": "skills",
+  "version": "1.0.0",
+  "description": "Claude Code skills, cloned onto a machine and switched on selectively.",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "prepare": "husky"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "private": "true",
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^17.5.1",
+    "prettier": "^3.9.6"
+  }
+}
