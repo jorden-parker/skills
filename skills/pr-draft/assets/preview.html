@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{TITLE}} · PR preview</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* {{GEIST_TOKENS}} */
+      /* {{GEIST_TYPE}} */
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--ds-background-100);
+        color: var(--ds-gray-1000);
+        font-family: var(--ds-font-sans);
+      }
+      main {
+        max-width: 880px;
+        margin: 0 auto;
+        padding: 48px 24px;
+      }
+      header {
+        margin-bottom: 32px;
+      }
+      .eyebrow {
+        color: var(--ds-gray-900);
+        margin: 0 0 16px;
+      }
+      h1 {
+        margin: 0 0 16px;
+        overflow-wrap: anywhere;
+      }
+      .badge {
+        display: inline-block;
+        padding: 4px 8px;
+        border: 1px solid var(--ds-gray-400);
+        border-radius: var(--ds-radius-base);
+        background: var(--ds-gray-100);
+        color: var(--ds-gray-900);
+      }
+      pre {
+        margin: 0;
+        padding: 24px;
+        border: 1px solid var(--ds-gray-400);
+        border-radius: var(--ds-radius-medium);
+        background: var(--ds-background-200);
+        white-space: pre;
+        overflow-x: auto;
+      }
+      article {
+        overflow-wrap: anywhere;
+      }
+      article h1,
+      article h2,
+      article h3 {
+        margin-top: 32px;
+      }
+      article a {
+        color: var(--ds-blue-900);
+      }
+      article li {
+        margin: 6px 0;
+      }
+      article blockquote {
+        margin-left: 0;
+        padding-left: 16px;
+        border-left: 3px solid var(--ds-gray-400);
+        color: var(--ds-gray-900);
+      }
+      article code {
+        font-family: var(--ds-font-mono);
+      }
+      article :not(pre) > code {
+        background: var(--ds-gray-100);
+        padding: 2px 4px;
+        border-radius: var(--ds-radius-base);
+      }
+      article table {
+        display: block;
+        overflow-x: auto;
+        border-collapse: collapse;
+      }
+      article th,
+      article td {
+        padding: 10px 12px;
+        border: 1px solid var(--ds-gray-400);
+        text-align: left;
+      }
+      article th {
+        background: var(--ds-background-200);
+      }
+      article img {
+        max-width: 100%;
+      }
+      .code-block {
+        margin: 24px 0;
+      }
+      .code-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 8px;
+        color: var(--ds-gray-900);
+      }
+      button {
+        font-family: inherit;
+        cursor: pointer;
+        padding: 0 12px;
+        height: var(--ds-size-small);
+        border: 1px solid var(--ds-gray-400);
+        border-radius: var(--ds-radius-base);
+        background: var(--ds-background-100);
+        color: var(--ds-gray-1000);
+      }
+      button:hover {
+        background: var(--ds-gray-100);
+      }
+      button:focus-visible {
+        outline: var(--ds-focus-ring-outline);
+      }
+      footer {
+        margin-top: 24px;
+        color: var(--ds-gray-900);
+      }
+      @media (max-width: 480px) {
+        main {
+          padding: 24px 16px;
+        }
+        pre {
+          padding: 16px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="eyebrow text-label-13">Pull request description</p>
+        <h1 class="text-heading-32">{{TITLE}}</h1>
+        <span class="badge text-label-13">Local preview</span>
+      </header>
+      <article id="description" class="text-copy-16"></article>
+      <textarea id="markdown-source" hidden>{{BODY}}</textarea>
+      <noscript>Enable JavaScript to render this description.</noscript>
+      <footer class="text-copy-14">
+        Local preview. Previewing does not publish or update a pull request.
+      </footer>
+    </main>
+    <script>
+      /* {{MARKED}} */
+    </script>
+    <script>
+      /* {{DOMPURIFY}} */
+    </script>
+    <script>
+      const description = document.getElementById("description");
+      description.innerHTML = DOMPurify.sanitize(
+        marked.parse(document.getElementById("markdown-source").value),
+        {
+          USE_PROFILES: { html: true },
+          FORBID_TAGS: ["style", "form", "textarea", "button"],
+          FORBID_ATTR: ["style", "id", "name"],
+        }
+      );
+      description.querySelectorAll("input").forEach((input) => {
+        if (input.type === "checkbox") input.disabled = true;
+        else input.remove();
+      });
+      description
+        .querySelectorAll("h1, h2")
+        .forEach((heading) => heading.classList.add("text-heading-24"));
+      description
+        .querySelectorAll("h3, h4, h5, h6")
+        .forEach((heading) => heading.classList.add("text-heading-20"));
+      description.querySelectorAll("pre > code").forEach((code, index) => {
+        const pre = code.parentElement;
+        pre.classList.add("text-copy-14");
+        const block = document.createElement("div");
+        block.className = "code-block";
+        const toolbar = document.createElement("div");
+        toolbar.className = "code-toolbar text-label-13";
+        const label = document.createElement("span");
+        label.textContent =
+          [...code.classList]
+            .find((name) => name.startsWith("language-"))
+            ?.slice(9) || "Code";
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "text-button-14";
+        button.textContent = "Copy";
+        button.setAttribute("aria-label", `Copy code block ${index + 1}`);
+        const status = document.createElement("span");
+        status.setAttribute("role", "status");
+        button.addEventListener("click", async () => {
+          try {
+            await navigator.clipboard.writeText(code.textContent);
+            status.textContent = "Copied";
+          } catch {
+            const range = document.createRange();
+            range.selectNodeContents(code);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+            status.textContent = "Code selected. Press ⌘C or Ctrl+C to copy.";
+          }
+        });
+        toolbar.append(label, status, button);
+        pre.before(block);
+        block.append(toolbar, pre);
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+"""Render a PR description as portable Geist HTML and open it in the browser."""
+
+import argparse
+import html
+from pathlib import Path
+import re
+import subprocess
+import sys
+import webbrowser
+
+
+def repository_template(repo):
+    """Find local PR templates without choosing arbitrarily among alternatives."""
+    if not repo.is_dir():
+        raise ValueError(f"repository directory does not exist: {repo}")
+    root = subprocess.run(
+        ["git", "-C", str(repo), "rev-parse", "--show-toplevel"],
+        capture_output=True, text=True, check=False,
+    )
+    repo = Path(root.stdout.strip()) if root.returncode == 0 else repo.resolve()
+    candidates = []
+    for directory in (repo, repo / "docs", repo / ".github"):
+        if not directory.is_dir():
+            continue
+        for path in directory.iterdir():
+            if path.is_file() and path.stem.lower() == "pull_request_template":
+                candidates.append(path)
+            elif path.is_dir() and path.name.lower() == "pull_request_template":
+                candidates.extend(item for item in path.iterdir() if item.is_file() and item.suffix.lower() in (".md", ".markdown", ".txt"))
+    candidates = sorted(set(candidates))
+    if len(candidates) > 1:
+        raise ValueError("multiple PR templates found; pass the chosen template or completed body as the body argument:\n" + "\n".join(str(path) for path in candidates))
+    return candidates[0] if candidates else None
+
+
+def main():
+    skill = Path(__file__).resolve().parent
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("body", nargs="?", type=Path,
+                        help="Completed Markdown body or chosen template (default: repository PR template, then bundled fallback)")
+    parser.add_argument("--repo", type=Path, default=Path.cwd(),
+                        help="Repository to search for a PR template (default: current directory)")
+    parser.add_argument("--title", default="Draft pull request", help="PR title")
+    parser.add_argument("--output", required=True, type=Path, help="New HTML file to write")
+    args = parser.parse_args()
+
+    try:
+        body = args.body or repository_template(args.repo) or skill / "assets/body.md"
+        geist = skill.parent / "geist"
+        modules = skill.parent.parent / "node_modules"
+        if not (modules / "marked/lib/marked.umd.js").is_file() or not (modules / "dompurify/dist/purify.min.js").is_file():
+            parser.exit(1, f"preview: run npm ci in {skill.parent.parent} first\n")
+        template = (skill / "assets/preview.html").read_text(encoding="utf-8")
+        replacements = {
+            "{{TITLE}}": html.escape(args.title),
+            "{{BODY}}": html.escape(body.read_text(encoding="utf-8")),
+            "/* {{GEIST_TOKENS}} */": (geist / "geist-tokens.css").read_text(encoding="utf-8"),
+            "/* {{GEIST_TYPE}} */": (geist / "geist-type.css").read_text(encoding="utf-8"),
+            "/* {{MARKED}} */": (modules / "marked/lib/marked.umd.js").read_text(encoding="utf-8"),
+            "/* {{DOMPURIFY}} */": (modules / "dompurify/dist/purify.min.js").read_text(encoding="utf-8"),
+        }
+        # One pass keeps placeholder-like text inside user content literal.
+        pattern = "|".join(re.escape(key) for key in replacements)
+        document = re.sub(pattern, lambda match: replacements[match.group()], template)
+        with args.output.open("x", encoding="utf-8") as output:
+            output.write(document)
+    except (OSError, UnicodeError, ValueError) as error:
+        parser.exit(1, f"preview: {error}\n")
+    path = args.output.resolve()
+    print(path)
+    try:
+        if sys.platform == "darwin":
+            opened = subprocess.run(["open", path.as_uri()], check=False).returncode == 0
+        else:
+            opened = webbrowser.open(path.as_uri(), new=2)
+    except (OSError, webbrowser.Error):
+        opened = False
+    if not opened:
+        print(f"preview: browser could not open {path}", file=sys.stderr)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
