@@ -53,27 +53,11 @@ The diff tells you what changed. Only these tell you why, and the why is the hal
 
 ## 3. Write the body
 
-**If the repo has a PR template, it wins.** Check `.github/pull_request_template.md`, `.github/PULL_REQUEST_TEMPLATE/`, and `docs/pull_request_template.md`. Fill its sections; do not add, drop, or reorder them. Leave checkboxes unticked unless you actually verified the thing.
+**The repository's PR template defines the draft's structure.** Before writing the body, read its `pull_request_template` file or `PULL_REQUEST_TEMPLATE/` directory in the repository root, `.github/`, or `docs/`, including uppercase filename variants. If several templates exist, use the one specified by the user or repository instructions; ask which to use when the choice remains ambiguous. Where the repository inherits an organization template, use that before the bundled fallback.
 
-**If there is no template**, use:
+Fill the selected template in place, preserving its headings, section order, checklists, tables, and required prompts. Leave checkboxes unticked unless you actually verified the thing. Keep the same structure in the HTML preview and the submitted PR body; Geist supplies presentation only. Before previewing or publishing, compare the completed body against the selected template to ensure every required section is retained.
 
-```md
-## What & why
-
-One paragraph. What this changes and the problem it solves. Link the issue.
-
-## Changes
-
-- Grouped by area, not by commit. A reviewer reads by subsystem.
-
-## Testing
-
-What you actually ran, and what you did not. Be honest about gaps.
-
-## Open questions
-
-Anything you want the reviewer to decide. Delete the section if empty.
-```
+**If there is no template**, fill [assets/body.md](assets/body.md). Replace its guidance with the actual description and remove Open questions when empty. Use fenced code blocks for commands and code worth copying.
 
 Wrap whatever you produce in markers:
 
@@ -83,6 +67,22 @@ Wrap whatever you produce in markers:
 ...generated body...
 <!-- pr-draft:end -->
 ```
+
+### Local preview
+
+When the user asks to preview the description, run the bundled `preview` command with the body file and title. Resolve the executable relative to this skill's directory, even when working in another repository:
+
+```sh
+<skill-directory>/preview /tmp/pr-body-new.md --title "<title>" --output /tmp/pr-preview.html
+```
+
+For an actual draft, pass the completed body that follows the selected repository template. Omitting the body path previews the local repository template without filling it; the command searches from the current Git repository, or `--repo <path>`, and falls back to the bundled template only when no local template exists. It reports multiple candidates so you can pass the chosen template explicitly. Pass an inherited organization template explicitly as well.
+
+Choose an unused output path; the command preserves existing files. It requires Python 3 and a one-time `pnpm install` in this skills repository to install the renderer. It prints the generated file's absolute path and automatically opens it in the default browser. If opening fails, report that and provide the path.
+
+The preview renders the whole description as HTML in [assets/preview.html](assets/preview.html), with headings, lists, tables, links, and a copy button on each code block. Managed Block markers remain in the Markdown and are invisible in the rendered description. Marked renders Markdown and DOMPurify sanitizes the HTML. Both libraries and the sibling [Geist](../geist/SKILL.md) token and type CSS are embedded in the output, so rendering works offline in light and dark themes. Fonts load from Google Fonts with local fallbacks. Read the Geist skill before changing the preview's styling.
+
+The HTML is a local companion; the Markdown body remains the input to `gh`. A preview-only request ends after producing the HTML, before pushing or creating/updating a PR.
 
 ## 4. Write the title
 

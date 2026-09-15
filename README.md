@@ -31,13 +31,13 @@ The picker uses `fzf` when it is installed and falls back to a numbered menu whe
 `/pr-draft` uses [a reusable body template](skills/pr-draft/assets/body.md) when the target repository has none. Preview a body file locally with Geist styling:
 
 ```sh
-npm ci
+pnpm install
 ./skills/pr-draft/preview /tmp/pr-body.md --title "Cache the resolved config" --output /tmp/pr-preview.html
 ```
 
 The draft follows the target repository's PR template, preserving its sections and checklists. Pass the completed body to preview it. Omit the body path to preview the local repository's template, using `--repo <path>` when outside that repository; the bundled template is the fallback when none exists. If several templates exist, pass the chosen file explicitly.
 
-The command requires Python 3 and a one-time `npm ci`. It renders the full description as HTML with copyable code blocks, writes a new file, and opens it in your default browser. It preserves existing files and makes no GitHub changes. The renderer and Geist styles are embedded; Google Fonts uses local fallbacks when offline.
+The command requires Python 3 and a one-time `pnpm install`. It renders the full description as HTML with copyable code blocks, writes a new file, and opens it in your default browser. It preserves existing files and makes no GitHub changes. The renderer and Geist styles are embedded; Google Fonts uses local fallbacks when offline.
 
 ## Skills
 
