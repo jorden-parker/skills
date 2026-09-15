@@ -53,3 +53,13 @@ _Avoid_: variable, constant, theme value
 **Step**:
 The position of a colour within its scale, `100` through `1000`. The step number carries a fixed role (background, border, solid fill, text) that holds across every hue.
 _Avoid_: shade, weight, level
+
+### New projects
+
+**Shape**:
+The kind of thing being built — web app, CLI, library, service, or script. Settled before anything else, because it decides the framework, the layout, and the naming vocabulary.
+_Avoid_: type, category, kind
+
+**Green**:
+The state a new project must reach before it is handed over: it runs, it builds, it lints clean, it formats clean, and its first commit is in. Anything short of all five is not green.
+_Avoid_: working, done, ready
