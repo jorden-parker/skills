@@ -41,11 +41,12 @@ The command requires Python 3 and a one-time `pnpm install`. It renders the full
 
 ## Skills
 
-| Skill                                | What it does                                                                            |
-| ------------------------------------ | --------------------------------------------------------------------------------------- |
-| [`pr-draft`](skills/pr-draft/)       | Opens a draft PR for the current branch, or updates the existing one. `/`-invoked only. |
-| [`geist`](skills/geist/)             | Vercel's Geist Design System — real tokens, type scale, component recipes.              |
-| [`new-project`](skills/new-project/) | Takes an idea to a scaffolded, building, lint-clean repo — name, framework, directory.  |
+| Skill                                  | What it does                                                                            |
+| -------------------------------------- | --------------------------------------------------------------------------------------- |
+| [`pr-draft`](skills/pr-draft/)         | Opens a draft PR for the current branch, or updates the existing one. `/`-invoked only. |
+| [`geist`](skills/geist/)               | Vercel's Geist Design System — real tokens, type scale, component recipes.              |
+| [`new-project`](skills/new-project/)   | Takes an idea to a scaffolded, building, lint-clean repo — name, framework, directory.  |
+| [`web-research`](skills/web-research/) | Researches a question on the live web and cites every claim. `/`-invoked only.          |
 
 ## Repo layout
 
