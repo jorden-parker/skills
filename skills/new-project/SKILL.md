@@ -1,14 +1,24 @@
 ---
 name: new-project
-description: Scaffold a new project from zero - brainstorm the name, pick the framework, create the directory, and get it building and linting clean. Use when starting a new app, CLI, library, or service, or when the user has an idea but no repository yet.
-argument-hint: "optional: the idea, in a sentence"
+description: Initialise project tooling in an existing project or scaffold a new app, CLI, library, or service. Use when setting up a project or adding its formatting, linting, Git hooks, and agent instructions; infer the path from the current directory.
+argument-hint: "optional: the idea, project path, or setup needed"
 ---
 
 # New project
 
-Take an idea to a repository that is **green**: it runs, it builds, it lints clean, and its first commit is in.
+Bring a new or existing project to **green**: its applicable build, lint, formatting, typecheck, test, and runtime checks pass.
 
-Work the steps in order. Each one ends on a user decision or a command that exits zero - do not carry an open question into the next step.
+## 0. Infer the target
+
+Start in the current directory unless the user specifies another path. Read its instructions, manifests, lockfiles, source layout, and Git status; inspect parent directories to identify the project or workspace root.
+
+- **Existing project:** source, a manifest, or project configuration identifies a project here or in a containing directory. Initialise missing tooling in place. Retain its name, language, framework, package manager, and workspace layout. In a monorepo, use the current package as the target and respect shared root configuration.
+- **New project in place:** the directory is empty or contains only starter material such as Git metadata, a README, or a licence. Use this directory and infer the name from it, preserving those files.
+- **New project in a child directory:** the current directory is a collection of projects or a general location such as `~/src` or the home directory. Create `<name>` beneath it.
+
+An explicit request for a separate new project takes precedence over an existing project in the current directory. Ask only when the target remains ambiguous or creating it would overwrite existing files. State the selected path and mode, then proceed.
+
+**Done when** the target path, mode, existing tooling, and pre-existing changes are identified. For an existing project, infer the brief from its files, skip naming and framework selection, and continue at step 4.
 
 ## 1. Pin the shape
 
@@ -21,11 +31,11 @@ Ask whatever you cannot infer from the user's sentence, then write a brief of at
 - The one thing it must do to be worth existing.
 - Anything already decided: a language, a host, an existing repo it must sit beside.
 
-**Done when** the user has confirmed that paragraph. Their "yes" is the gate; an assumed shape is a rewrite later.
+**Done when** the brief identifies the shape and purpose, with only decisions that materially affect scaffolding clarified with the user.
 
 ## 2. Name it
 
-Names come from the brief, not from thin air.
+Use a name supplied by the user or inferred from the target directory. When neither supplies one, names come from the brief:
 
 1. Pull the concrete words out of the brief: the domain objects, the verb it performs, the metaphor hiding in it.
 2. Generate across four registers, so the list is not five variations of one idea:
@@ -42,11 +52,11 @@ gh search repos "<name>" --limit 5       # collisions worth knowing about
 
 4. Present exactly five, each with a one-line rationale and its screening result. Say which one you would pick and why.
 
-**Done when** the user picks one. Stop and wait for that answer - naming is theirs, and the directory name, the package name, and the module path all inherit from it.
+**Done when** the name is supplied, inferred from the target directory, or selected by the user. If you presented candidates, wait for their choice before creating the directory.
 
 ## 3. Pick the framework
 
-Take the default for the shape unless the brief names a reason to move off it. State the default and the reason in one line, then go.
+For a new project, take the default for the shape unless the brief names a reason to move off it. State the default and the reason in one line, then go.
 
 | Shape           | Default                                                                     | Move off it when                                                    |
 | --------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------- |
@@ -58,7 +68,7 @@ Take the default for the shape unless the brief names a reason to move off it. S
 
 ### Package manager
 
-`pnpm`, except on a project that runs on Bun - a single-binary CLI, a Bun-native service - where it is `bun`. Never `npm`; a `package-lock.json` in a new project is a mistake to correct, not a default to accept.
+For new JavaScript/TypeScript projects, use `pnpm`, except on a project that runs on Bun, where it is `bun`. For existing projects, infer the package manager from its declared version, lockfile, and instructions; preserve it. Adapt the commands below to that manager and the project’s language.
 
 Every command from here on is written in `pnpm` form. On a Bun project, substitute:
 
@@ -72,19 +82,19 @@ Every command from here on is written in `pnpm` form. On a Bun project, substitu
 
 `pnpm` keeps `node_modules` strict, so anything a config imports has to be a direct dependency of the project. That is why `eslint`, `jiti`, and every plugin below get installed explicitly rather than leaned on transitively.
 
-Anything JavaScript-flavoured is TypeScript, config files included: `eslint.config.ts`, not `eslint.config.mjs`. Rename what a scaffolder writes in plain JavaScript rather than leaving it.
+In new projects, anything JavaScript-flavoured is TypeScript, config files included: `eslint.config.ts`, not `eslint.config.mjs`. Rename what a scaffolder writes in plain JavaScript rather than leaving it.
 
-## 4. Scaffold
+## 4. Initialise
 
-Default location is `~/src/<name>`. Confirm it, then create there.
+For an existing project, first run available checks to establish a baseline. Use its existing package manager for all commands below. Work in place: compare each setup section below with what is installed, retain equivalent working tooling, and add what is missing. Merge configuration, scripts, hooks, and agent instructions into their existing owners. A repeat run should leave already-complete setup unchanged. Preserve existing source and user changes; a tooling setup is not a framework, package-manager, or design-system migration.
 
-Run the framework's own scaffolder rather than hand-building a tree. For the Next.js default:
+For a new project, scaffold into the path selected in step 0. Use `.` as the destination when already inside that directory. Run the framework's own scaffolder when available; if it cannot preserve starter files, generate in a temporary directory and merge the scaffold. For the Next.js default:
 
 ```sh
 pnpm create next-app@latest <name> --typescript --tailwind --app --eslint --use-pnpm
 ```
 
-Then, in the new directory:
+In the target directory, initialise Git only if it is not already inside a repository:
 
 ```sh
 git init
@@ -92,7 +102,7 @@ git init
 
 ### Formatting
 
-Set this up before the first commit, so there is never a reformat-the-world diff later.
+For a new project, use the defaults below. For an existing project, retain its formatting choices and hook runner; add missing checks to its hooks and preserve existing commands, including `prepare`. Run `husky init` only when Husky is absent, and preserve any existing hooks it would replace.
 
 ```sh
 pnpm add -D prettier husky lint-staged
@@ -135,7 +145,7 @@ Drop the lines whose scripts the project does not have yet, and say which ones y
 
 The `*` glob with `--ignore-unknown` covers Markdown, JSON, and YAML alongside the code, and skips anything Prettier has no parser for.
 
-Add both scripts to `package.json`:
+Add missing formatting scripts to `package.json`, retaining existing equivalents:
 
 ```json
 "format": "prettier --write .",
@@ -146,7 +156,7 @@ The hook and the check do different jobs. The hook rewrites **staged** files on 
 
 ### Linting
 
-Every project gets ESLint, whatever its shape. Copy [`assets/no-comments.ts`](assets/no-comments.ts) to `eslint-rules/no-comments.ts` in the new project - it is a local rule that requires code to explain itself instead of carrying comments that drift out of date.
+For JavaScript/TypeScript projects, add ESLint when absent and extend the existing lint setup. For other languages, use their native lint and formatting tools; omit JavaScript-only rules unless the project also contains JavaScript/TypeScript. Copy [`assets/no-comments.ts`](assets/no-comments.ts) to `eslint-rules/no-comments.ts` in the target project if absent - it is a local rule that requires code to explain itself instead of carrying comments that drift out of date.
 
 ```sh
 pnpm add -D eslint jiti typescript
@@ -154,7 +164,7 @@ pnpm add -D eslint jiti typescript
 
 `jiti` is what lets ESLint load a TypeScript config and a TypeScript rule. Without it, `eslint.config.ts` fails to resolve.
 
-`eslint.config.ts`, or the entries to append when the scaffolder already wrote a config - rename its `.mjs` to `.ts` first:
+`eslint.config.ts`, or the entries to merge into an existing config without duplicating the rule. Keep an existing project’s config format; new scaffolds use `.ts`:
 
 ```ts
 import noComments from "./eslint-rules/no-comments.ts";
@@ -173,7 +183,7 @@ Keep whatever `lint` script the scaffolder wrote, or add `"lint": "eslint ."` wh
 
 ### Commit messages
 
-Conventional Commits, enforced rather than remembered:
+Add Conventional Commits enforcement when absent, using the existing hook runner. Preserve existing commitlint configuration and merge the hook command rather than replacing other checks. For a new Husky setup:
 
 ```sh
 pnpm add -D @commitlint/cli @commitlint/config-conventional
@@ -199,7 +209,7 @@ echo "feat: add stuff" | pnpm exec commitlint    # must print nothing
 
 ### AGENTS.md
 
-Write it while the decisions are still fresh. It carries what the next agent cannot read off the config: the shape, the one thing it must do, and the conventions chosen here. Include these lines verbatim:
+Create or update the applicable `AGENTS.md`, preserving existing instructions and avoiding duplicates. Record the shape, purpose, and conventions established here. Adapt these lines to the actual package manager and installed checks; include the no-comments and commit-message instructions only when their enforcement is configured:
 
 ```md
 - Run `pnpm lint` and `pnpm format:check` after making changes, and fix everything they report.
@@ -208,16 +218,9 @@ Write it while the decisions are still fresh. It carries what the next agent can
 - Commit messages are Conventional Commits (`feat:`, `fix:`, `chore:`). The `commit-msg` hook rejects anything else.
 ```
 
-### First commit
+**Building a UI?** Read [`FRONTEND.md`](FRONTEND.md). Apply its setup to a new frontend before writing components; for an existing frontend, follow its compatibility guidance.
 
-```sh
-git add -A
-git commit -m "chore: initial commit"
-```
-
-This commit runs both hooks, which makes it the smoke test: it proves formatting is applied on the way in and that the message passes commitlint. A clean `git status` afterwards is the signal.
-
-**Building a UI?** Read [`FRONTEND.md`](FRONTEND.md) and follow it before writing a single component. It wires shadcn/ui, the Geist Design System, and `@shadcn/lint` together, and the wiring is much cheaper before components exist than after.
+**Done when** every applicable setup section is configured or already satisfied, with any incompatible or deferred additions explained.
 
 ## 5. Make it green
 
@@ -230,12 +233,10 @@ pnpm format:check
 pnpm dev     # boot it, confirm it serves, stop it
 ```
 
-Fix everything they report, including findings in code the scaffolder wrote rather than you. A template's output is not automatically clean - unused imports, a missing env var, and the comments `create-next-app` sprinkles through its boilerplate, which `local/no-comments` will now flag.
+Use the scripts actually available, including typecheck and tests when present. For a CLI, library, or script, use an appropriate smoke check instead of starting a web server. A dev server is verified when it serves successfully and is then stopped.
 
-**Done when** all four exit clean and the tree is committed. Report the path, the framework, and the commands the user runs day to day.
+Fix failures introduced by the setup. In an existing project, compare failures against the original state; report pre-existing failures separately. If a new rule requires widespread source cleanup, scope adoption explicitly or ask before undertaking that migration. Never describe failing checks as green.
 
-## Stop and ask
+For a new project, stage the generated setup and make `chore: initial commit` after verification, provided there are no unrelated pre-existing changes. For an existing project, leave changes ready for review unless the user requested a commit; when committing, stage only the task’s changes. Exercise configured hooks and check that commitlint rejects an invalid message and accepts a valid one.
 
-- The directory already exists and is not empty.
-- The user's idea is close enough to an existing repository of theirs that the answer might be a branch, not a new project.
-- A scaffolder wants to overwrite something.
+**Done when** the applicable checks pass, or remaining failures are clearly identified with their cause and blocker. Review the diff for unrelated changes. Report the target path, what was initialised or retained, and verification results.

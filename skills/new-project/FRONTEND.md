@@ -2,7 +2,9 @@
 
 The UI branch of [`new-project`](SKILL.md). Three pieces that only work well together: **shadcn/ui** supplies the components, **Geist** supplies the values they render with, and **`@shadcn/lint`** stops the two from drifting apart.
 
-Do this on a fresh scaffold, before components exist. Retrofitting it means re-theming every component already written.
+For a new frontend, follow this setup before writing components. For an existing frontend, inspect its components, styling, tokens, and lint configuration first. Reuse existing shadcn/ui and Geist wiring, merge missing compatible configuration, and follow the project’s paths and package manager. Preserve an established design system; adopting this stack where it would replace that system requires a separate migration decision. Run `shadcn init` only when shadcn is absent and compatible with the existing stack.
+
+The examples below assume a new Next.js frontend. Adapt framework-specific steps to the actual project; use `next/font` only in Next.js.
 
 Requires Node 20.19+ and ESLint 9.30+. Check both before starting - `create-next-app` will happily scaffold on an older Node and fail at the lint step.
 
@@ -82,7 +84,7 @@ pnpm add geist
 
 ## 3. @shadcn/lint
 
-Read <https://github.com/shadcn-ui/lint/blob/main/SETUP.md> and follow it. Two things about a new project change what it tells you:
+Read <https://github.com/shadcn-ui/lint/blob/main/SETUP.md> and follow it. For existing frontends, follow its adoption scope guidance and merge rules with the existing lint configuration. For new projects, two things change what it tells you:
 
 - **Its scope rule is written for existing repositories**, where enabling rules would flood the user with findings. Here there is no code yet, so turn the rules on now. Starting strict costs nothing; retrofitting them costs a cleanup pass.
 - **It picks Oxlint when no linter exists.** `create-next-app --eslint` already wrote one, so take the ESLint path and register the plugin into the config that is already there - the `eslint.config.ts` renamed from `.mjs` in `SKILL.md`.

@@ -75,5 +75,5 @@ The kind of thing being built — web app, CLI, library, service, or script. Set
 _Avoid_: type, category, kind
 
 **Green**:
-The state a new project must reach before it is handed over: it runs, it builds, it lints clean, it formats clean, and its first commit is in. Anything short of all five is not green.
+The state a new or existing project must reach before it is handed over: every applicable build, lint, formatting, typecheck, test, and runtime check passes. A new project's first commit follows green. A failing check is never green.
 _Avoid_: working, done, ready
