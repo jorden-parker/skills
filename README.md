@@ -20,7 +20,23 @@ The installer symlinks every skill into `~/.claude/skills`, then records which o
 ./install --sync             # link new skills, keep states, no prompts
 ./install --set geist=off    # set one directly
 ./install --unlink geist     # remove the symlink entirely
+./refresh                   # refresh existing installations across agent apps
+./refresh new-project       # refresh one skill
+./refresh --check            # inspect without changing files
 ```
+
+`refresh` requires Python 3 and Git. It checks `~/.agents/skills`,
+`${CODEX_HOME:-$HOME/.codex}/skills`, and
+`${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills`. Recognised copies are backed up under
+`skill-backups` beside the installation's `skills` directory, then replaced with
+links to this checkout. Future repo edits are immediately available through those
+links. Absent installations and app settings are left unchanged.
+
+A copy is recognised when its `SKILL.md` matches the current source or a version
+in this checkout's Git history. Unrecognised copies, including broken links, are
+left untouched and reported for review. `--check` exits with status 1 when a
+refresh or review is needed. Use a fresh agent session if it already loaded old
+instructions.
 
 `--set` takes `on`, `off`, `name-only` (the model sees the name but not the description — cheaper context) or `user-invocable-only` (you can `/invoke` it, the model cannot reach for it on its own).
 
