@@ -1,0 +1,198 @@
+#!/usr/bin/env python3
+"""Render a Markdown file as a portable Geist HTML artifact and open it in the browser."""
+
+import argparse
+from datetime import date
+import html
+from pathlib import Path
+import re
+import subprocess
+import sys
+import tempfile
+import webbrowser
+
+FENCE = re.compile(r"^\s*(```|~~~)")
+HEADING = re.compile(r"^(#{1,6})\s+(.*?)\s*#*\s*$")
+ITEM = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+")
+NUMBERED = re.compile(r"^(\d+)[.)]\s+(.*)$")
+MARKER = re.compile(r"\[(\d+)\](?![(:\[])")
+URL = re.compile(r"https?://\S+")
+
+
+def prose_lines(markdown):
+    """Yield (line number, text) with fenced blocks dropped and inline code blanked."""
+    fenced = False
+    for number, line in enumerate(markdown.splitlines(), 1):
+        if FENCE.match(line):
+            fenced = not fenced
+            continue
+        if not fenced:
+            yield number, re.sub(r"`[^`]*`", "", line)
+
+
+def sections(markdown):
+    """Yield (heading text, level, lines) for each heading, lines running to the next heading of any level."""
+    title, level, lines = None, 0, []
+    for number, line in prose_lines(markdown):
+        heading = HEADING.match(line)
+        if heading:
+            yield title, level, lines
+            title, level, lines = heading.group(2), len(heading.group(1)), []
+        else:
+            lines.append((number, line))
+    yield title, level, lines
+
+
+def section_bodies(markdown, name):
+    """Lines under the heading called name, including its deeper subsections."""
+    found, depth = [], None
+    for title, level, lines in sections(markdown):
+        if depth is not None and level > depth:
+            found[-1].extend(lines)
+        elif title is not None and title.strip().lower() == name.lower():
+            depth = level
+            found.append(list(lines))
+        else:
+            depth = None
+    return found
+
+
+def blocks(lines):
+    """Split lines into paragraphs, tables, and single list items. Quotes are skipped: they sit beside a claim."""
+    block = []
+    for number, line in lines:
+        if not line.strip():
+            if block:
+                yield block
+            block = []
+        elif line.lstrip().startswith(">"):
+            continue
+        elif ITEM.match(line) and block:
+            yield block
+            block = [(number, line)]
+        else:
+            block.append((number, line))
+    if block:
+        yield block
+
+
+def citation_problems(markdown, cited_sections):
+    """Every way the markers, the Sources list, and the cited sections fail to line up."""
+    bodies = section_bodies(markdown, "Sources")
+    if not bodies:
+        return ["no `Sources` heading: add one holding a numbered list, one item per source"]
+    problems = []
+    source_lines = {number for body in bodies for number, _ in body}
+    sources = {}
+    for body in bodies:
+        for number, line in body:
+            item = NUMBERED.match(line)
+            if item:
+                sources[int(item.group(1))] = (number, item.group(2))
+    if not sources:
+        problems.append("`Sources` holds no numbered items (`1. Title - Publisher. https://...`)")
+    if sorted(sources) != list(range(1, len(sources) + 1)):
+        problems.append(f"Sources are numbered {sorted(sources)}; number them 1..{len(sources)} in order of first use")
+    for index, (number, text) in sorted(sources.items()):
+        if not URL.search(text):
+            problems.append(f"line {number}: source {index} has no URL on its first line")
+
+    used = {}
+    for number, line in prose_lines(markdown):
+        if number not in source_lines:
+            for marker in MARKER.finditer(line):
+                used.setdefault(int(marker.group(1)), number)
+    if not used:
+        problems.append("no `[n]` markers anywhere outside Sources")
+    for index, number in sorted(used.items()):
+        if index not in sources:
+            problems.append(f"line {number}: marker [{index}] has no Sources item")
+    for index, (number, _) in sorted(sources.items()):
+        if index not in used:
+            problems.append(f"line {number}: source {index} is never cited")
+
+    for name in cited_sections:
+        found = section_bodies(markdown, name)
+        if not found:
+            problems.append(f"no `{name}` heading, but --cited-section {name} was passed")
+        for body in found:
+            for block in blocks(body):
+                if not any(MARKER.search(line) for _, line in block):
+                    number, line = block[0]
+                    problems.append(f"line {number}: no marker under `{name}`: {line.strip()[:70]}")
+    return problems
+
+
+def slug(text):
+    return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:48] or "artifact"
+
+
+def main():
+    root = Path(__file__).resolve().parent
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("body", type=Path, help="Markdown file to render")
+    parser.add_argument("--title", required=True, help="Page heading")
+    parser.add_argument("--eyebrow", default="Artifact", help="Small label above the heading, naming the kind of page")
+    parser.add_argument("--footer", default="", help="Footer note (default: the render date)")
+    parser.add_argument("--output", type=Path, help="New HTML file to write (default: a fresh file in the temp directory)")
+    parser.add_argument("--citations", action="store_true",
+                        help="Refuse to render unless every [n] marker has a numbered Sources item with a URL, and every item is cited")
+    parser.add_argument("--cited-section", action="append", default=[], metavar="HEADING",
+                        help="Implies --citations; every paragraph, table, and list item under HEADING must carry a marker. Repeatable")
+    parser.add_argument("--no-open", action="store_true", help="Write the file and print its path without opening a browser")
+    args = parser.parse_args()
+
+    try:
+        markdown = args.body.read_text(encoding="utf-8")
+        if args.citations or args.cited_section:
+            problems = citation_problems(markdown, args.cited_section)
+            if problems:
+                listing = "\n".join(f"  - {problem}" for problem in problems)
+                parser.exit(2, f"artifact: citations are red, nothing rendered. Fix {args.body} and rerun:\n{listing}\n")
+        geist = root.parent / "skills/geist"
+        modules = root.parent / "node_modules"
+        if not (modules / "marked/lib/marked.umd.js").is_file() or not (modules / "dompurify/dist/purify.min.js").is_file():
+            parser.exit(1, f"artifact: run pnpm install in {root.parent} first\n")
+        template = (root / "page.html").read_text(encoding="utf-8")
+        replacements = {
+            "{{TITLE}}": html.escape(args.title),
+            "{{EYEBROW}}": html.escape(args.eyebrow),
+            "{{FOOTER}}": html.escape(args.footer or f"Rendered {date.today().isoformat()}."),
+            "{{BODY}}": html.escape(markdown),
+            "/* {{GEIST_TOKENS}} */": (geist / "geist-tokens.css").read_text(encoding="utf-8"),
+            "/* {{GEIST_TYPE}} */": (geist / "geist-type.css").read_text(encoding="utf-8"),
+            "/* {{MARKED}} */": (modules / "marked/lib/marked.umd.js").read_text(encoding="utf-8"),
+            "/* {{DOMPURIFY}} */": (modules / "dompurify/dist/purify.min.js").read_text(encoding="utf-8"),
+        }
+        # One pass keeps placeholder-like text inside user content literal.
+        pattern = "|".join(re.escape(key) for key in replacements)
+        document = re.sub(pattern, lambda match: replacements[match.group()], template)
+        if args.output:
+            with args.output.open("x", encoding="utf-8") as output:
+                output.write(document)
+            path = args.output.resolve()
+        else:
+            directory = Path(tempfile.gettempdir()) / "artifacts"
+            directory.mkdir(parents=True, exist_ok=True)
+            with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=directory, prefix=f"{slug(args.title)}-",
+                                             suffix=".html", delete=False) as output:
+                output.write(document)
+            path = Path(output.name).resolve()
+    except (OSError, UnicodeError) as error:
+        parser.exit(1, f"artifact: {error}\n")
+    print(path)
+    if args.no_open:
+        return
+    try:
+        if sys.platform == "darwin":
+            opened = subprocess.run(["open", path.as_uri()], check=False).returncode == 0
+        else:
+            opened = webbrowser.open(path.as_uri(), new=2)
+    except (OSError, webbrowser.Error):
+        opened = False
+    if not opened:
+        print(f"artifact: browser could not open {path}", file=sys.stderr)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

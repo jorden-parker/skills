@@ -54,6 +54,20 @@ _Avoid_: variable, constant, theme value
 The position of a colour within its scale, `100` through `1000`. The step number carries a fixed role (background, border, solid fill, text) that holds across every hue.
 _Avoid_: shade, weight, level
 
+### Artifacts
+
+**Artifact**:
+A standalone HTML page rendered from one Markdown file by `artifact/render` and opened in the browser. The way any skill shows a result too long or too linked for the conversation.
+_Avoid_: report, preview, output page
+
+**Marker**:
+A bracketed number in an Artifact's prose, `[1]`, that points at the item with the same number under its Sources heading.
+_Avoid_: footnote, reference, superscript
+
+**Red**:
+The renderer's refusal to produce an Artifact because a Marker and the Sources list do not line up. Nothing is written until the Markdown is fixed.
+_Avoid_: failed, invalid, broken
+
 ### New projects
 
 **Shape**:
