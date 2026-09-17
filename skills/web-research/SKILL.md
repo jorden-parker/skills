@@ -1,6 +1,6 @@
 ---
 name: web-research
-description: Research a question on the live web and answer it with a citation on every claim.
+description: Research a question on the live web and open the findings as a browser page with a citation on every claim.
 argument-hint: "the question to research"
 disable-model-invocation: true
 ---
@@ -53,30 +53,46 @@ When sources disagree, keep both entries and record the disagreement: who says w
 
 **Done when** every load-bearing claim is corroborated or flagged **single-source**, and every disagreement is recorded.
 
-## 4. Write the answer
+## 4. Write the findings
 
-Reply in the conversation. Write to a file only when the user asks for one, and then follow the repo's existing convention for notes.
+Write the findings to a new Markdown file in the temp directory. When the user asks for a kept note, write it where the repo's existing convention for notes puts it instead.
 
-Shape:
+Use exactly these four `##` headings; the renderer in step 6 reads `Answer`, `Findings`, and `Sources` by name:
 
-1. **Answer** - the direct answer, in a few sentences.
-2. **Findings** - one short section per sub-question. Every factual sentence ends in a marker, `[1]` or `[2][3]`. A sentence that is your own inference says so in words ("this suggests") and cites what it is inferred from.
-3. **Disagreements and gaps** - conflicting sources, single-source claims, open sub-questions and what you searched for.
-4. **Sources** - numbered in order of first use:
+1. `## Answer` - the direct answer, in a few sentences, markers included.
+2. `## Findings` - one `###` section per sub-question. Every paragraph, table, and list item carries a marker, `[1]` or `[2][3]`. A sentence that is your own inference says so in words ("this suggests") and cites what it is inferred from.
+3. `## Disagreements and gaps` - conflicting sources, single-source claims, open sub-questions and what you searched for.
+4. `## Sources` - a numbered list in order of first use, one item per ledger URL, with the ledger passages quoted beneath it:
 
+```md
+1. Title - Publisher, published 2026-03-04. https://example.com/path (accessed 2026-09-17)
+   > "The verbatim passage from the ledger."
 ```
-[1] Title - Publisher, published 2026-03-04. https://example.com/path (accessed 2026-09-17)
-```
 
-Use "undated" when the page shows no date. Put a short verbatim quote beside the claim wherever the exact wording matters: numbers, definitions, legal or medical text.
+Use "undated" when the page shows no date. Put a short verbatim quote beside the claim as well wherever the exact wording matters: numbers, definitions, legal or medical text.
+
+**Done when** the file holds all four headings and every ledger entry used in the answer appears under Sources.
 
 ## 5. Audit the citations
 
-Walk the answer sentence by sentence against the ledger:
+Walk the file sentence by sentence against the ledger:
 
 - Every factual sentence has a marker.
-- Every marker resolves to a Sources line, and every Sources line is used.
 - Every URL is one you opened this run, copied from the ledger character for character.
 - The ledger passage says what the sentence says: same number, same scope, same hedging. Where the sentence claims more than the passage, weaken the sentence.
 
-**Done when** all four hold for every sentence. Fix and re-walk until they do, then send.
+**Done when** all three hold for every sentence. Fix and re-walk until they do.
+
+## 6. Open the artifact
+
+Render the file with the `artifact` command beside this `SKILL.md`:
+
+```sh
+<skill-directory>/artifact <findings.md> --title "<the question>" --eyebrow "Web research" --cited-section Answer --cited-section Findings
+```
+
+The command goes **red** (exit 2, nothing rendered) and names each line where a marker has no Sources item, a source has no URL or is never cited, or a block under Answer or Findings has no marker. Fix the file from the ledger and rerun; a marker you cannot back from the ledger means the sentence goes, not the check. **Green** prints the HTML path and opens the page in the browser, each marker linked to its source.
+
+Then reply in the conversation with the Answer section word for word, markers and their Sources lines included, and the path to the page.
+
+**Done when** the command is green and the reply carries the path it printed.

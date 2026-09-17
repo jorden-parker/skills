@@ -55,20 +55,31 @@ The draft follows the target repository's PR template, preserving its sections a
 
 The command requires Python 3 and a one-time `pnpm install`. It renders the full description as HTML with copyable code blocks, writes a new file, and opens it in your default browser. It preserves existing files and makes no GitHub changes. The renderer and Geist styles are embedded; Google Fonts uses local fallbacks when offline.
 
+### Artifacts
+
+Skills show a result as a page through [one shared renderer](artifact/README.md): Markdown in, a standalone Geist-styled HTML file out, opened in your default browser. `/web-research` uses its citation gate, which refuses to render until every `[n]` marker resolves to a numbered source with a URL.
+
+```sh
+./artifact/render findings.md --title "Which Node is LTS?" --citations
+```
+
+It needs Python 3 and the same one-time `pnpm install`.
+
 ## Skills
 
-| Skill                                  | What it does                                                                            |
-| -------------------------------------- | --------------------------------------------------------------------------------------- |
-| [`pr-draft`](skills/pr-draft/)         | Opens a draft PR for the current branch, or updates the existing one. `/`-invoked only. |
-| [`geist`](skills/geist/)               | Vercel's Geist Design System — real tokens, type scale, component recipes.              |
-| [`new-project`](skills/new-project/)   | Takes an idea to a scaffolded, building, lint-clean repo — name, framework, directory.  |
-| [`web-research`](skills/web-research/) | Researches a question on the live web and cites every claim. `/`-invoked only.          |
+| Skill                                  | What it does                                                                                    |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| [`pr-draft`](skills/pr-draft/)         | Opens a draft PR for the current branch, or updates the existing one. `/`-invoked only.         |
+| [`geist`](skills/geist/)               | Vercel's Geist Design System — real tokens, type scale, component recipes.                      |
+| [`new-project`](skills/new-project/)   | Takes an idea to a scaffolded, building, lint-clean repo — name, framework, directory.          |
+| [`web-research`](skills/web-research/) | Researches a question on the live web and opens the findings as a cited page. `/`-invoked only. |
 
 ## Repo layout
 
 ```
 skills/<name>/SKILL.md   the skills themselves
 install                  the installer
+artifact/                the shared Markdown-to-page renderer
 CONTEXT.md               glossary
 docs/adr/                decisions worth remembering
 ```
