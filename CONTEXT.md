@@ -1,6 +1,6 @@
 # Skills
 
-A portable collection of Claude Code skills, cloned onto a machine and activated selectively. The repo is the source of truth; a machine's Claude Code config only records which skills are active there.
+A portable collection of agent skills, cloned onto a machine and activated selectively. The repo is the source of truth; a machine's Links record which skills are installed there.
 
 ## Language
 
@@ -15,7 +15,7 @@ The `skills/` folder in this repo. The authoritative copy of every skill.
 _Avoid_: library, catalogue
 
 **Link**:
-The symlink from a machine's `~/.claude/skills/<name>` back into the Skills Directory. A skill is _installed_ when its Link exists.
+The symlink from a machine's `~/.agents/skills/<name>` back into the Skills Directory. A skill is _installed_ when its Link exists.
 _Avoid_: install, copy, deploy
 
 **State**:

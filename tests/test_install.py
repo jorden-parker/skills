@@ -20,7 +20,7 @@ class InstallTests(unittest.TestCase):
             source.mkdir(parents=True)
             (source / 'SKILL.md').write_text(f'---\nname: {name}\ndescription: {name} skill\n---\n')
         self.claude = self.base / 'claude'
-        self.links = self.claude / 'skills'
+        self.links = self.base / 'home/.agents/skills'
         self.settings = self.claude / 'settings.json'
         self.env = dict(os.environ, HOME=str(self.base / 'home'), CLAUDE_CONFIG_DIR=str(self.claude))
 
@@ -69,6 +69,20 @@ class InstallTests(unittest.TestCase):
         self.assertTrue((self.links / 'beta').is_symlink())
         self.assertIsNone(self.overrides())
         self.assertEqual(self.states(), {'alpha': 'off', 'beta': 'on'})
+
+    def test_claude_skills_do_not_control_state_or_get_modified(self):
+        legacy = self.claude / 'skills'
+        legacy.mkdir(parents=True)
+        link = legacy / 'alpha'
+        link.symlink_to(self.repo / 'skills/alpha', target_is_directory=True)
+        self.assertEqual(self.states(), {'alpha': 'off', 'beta': 'off'})
+        for args in [('--add', 'alpha'), ('--sync',), ('--remove', 'alpha')]:
+            result = self.run_install(*args)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(link.is_symlink())
+            self.assertEqual(link.readlink(), self.repo / 'skills/alpha')
+            self.assertEqual(sorted(p.name for p in legacy.iterdir()), ['alpha'])
+        self.assertEqual(self.states(), {'alpha': 'off', 'beta': 'off'})
 
     def test_real_directory_is_not_deleted(self):
         (self.links / 'alpha').mkdir(parents=True)

@@ -8,7 +8,7 @@ cd ~/src/skills
 ./install
 ```
 
-The installer symlinks the skills you pick into `~/.claude/skills` and removes the links for the ones you turn off. Nothing is copied, so `git pull` updates a linked skill in place. Skills new to the repo stay off until you add them.
+The installer symlinks the skills you pick into `~/.agents/skills` and reads that directory to determine which skills are installed. Turning a skill off removes its link there. Nothing is copied, so `git pull` updates a linked skill in place. Skills new to the repo stay off until you add them. Existing installations in other directories are left untouched.
 
 **Adding or removing a skill needs a new Claude Code session.** Edits to an existing skill are picked up by `/reload-skills`.
 
@@ -39,7 +39,7 @@ left untouched and reported for review. `--check` exits with status 1 when a
 refresh or review is needed. Use a fresh agent session if it already loaded old
 instructions.
 
-`--set` takes `on`, `off`, `name-only` (the model sees the name but not the description — cheaper context) or `user-invocable-only` (you can `/invoke` it, the model cannot reach for it on its own). `on` and `off` add or remove the link. The two partial states keep the link and write a `skillOverrides` entry in `~/.claude/settings.json`. A real directory at `~/.claude/skills/<name>` is never replaced or deleted.
+`--set` takes `on`, `off`, `name-only` (the model sees the name but not the description — cheaper context) or `user-invocable-only` (you can `/invoke` it, the model cannot reach for it on its own). `on` and `off` add or remove the link. The two partial states keep the link and write a Claude-specific `skillOverrides` entry in `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json`. `CLAUDE_CONFIG_DIR` only selects the settings directory; skill links always use `~/.agents/skills`. A real directory at `~/.agents/skills/<name>` is never replaced or deleted.
 
 The picker uses `fzf` when it is installed and falls back to a numbered menu when it is not. In the `fzf` picker: `TAB` toggles without moving the cursor, `ctrl-a` selects all, `ctrl-d` selects none, `ENTER` confirms. Everything selected is linked and keeps any partial state it had; everything unselected is unlinked. Confirming an empty selection changes nothing. JSON edits go through `jq`, or `python3` if `jq` is missing.
 

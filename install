@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Install and toggle the skills in this repo.
 #
-# A skill is "on" when ~/.claude/skills/<name> is a symlink into this
+# A skill is "on" when ~/.agents/skills/<name> is a symlink into this
 # checkout, and "off" when that link is absent. The two partial states,
 # name-only and user-invocable-only, keep the link and add a skillOverrides
 # entry in settings.json. See docs/adr/0003.
@@ -10,7 +10,7 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SRC_DIR="$REPO_DIR/skills"
 CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
-LINK_DIR="$CLAUDE_DIR/skills"
+LINK_DIR="$HOME/.agents/skills"
 SETTINGS="$CLAUDE_DIR/settings.json"
 STATES="$(mktemp -t skillstates)"
 BEFORE="$(mktemp -t skillstates-before)"
@@ -44,7 +44,7 @@ Usage: ./install [options]
 
   (no options)     Interactive: pick which skills are on.
   --list           Show each skill and its current state.
-  --add NAME       Link a skill into ~/.claude/skills. Repeatable.
+  --add NAME       Link a skill into ~/.agents/skills. Repeatable.
   --remove NAME    Remove a skill's link. Repeatable.
   --set NAME=STATE Set one skill's state directly. Repeatable.
   --sync           Repair links that point at an old checkout and drop links
@@ -129,7 +129,7 @@ describe() { # $1 = skill name
   sed -n 's/^description: *//p' "$SRC_DIR/$1/SKILL.md" | head -1 | cut -c1-90
 }
 
-is_linked() { # $1 = skill name -> 0 when ~/.claude/skills/<name> exists
+is_linked() { # $1 = skill name -> 0 when ~/.agents/skills/<name> exists
   [ -e "$LINK_DIR/$1" ] || [ -L "$LINK_DIR/$1" ]
 }
 
