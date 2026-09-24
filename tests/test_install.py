@@ -1,5 +1,7 @@
 import json
 import os
+import pty
+import sys
 from pathlib import Path
 import shutil
 import subprocess
@@ -28,6 +30,81 @@ class InstallTests(unittest.TestCase):
     def run_install(self, *args):
         return subprocess.run([str(self.repo / 'install'), *args], capture_output=True,
                               text=True, env=self.env, stdin=subprocess.DEVNULL)
+
+    def run_garden(self, responses):
+        """Exercise the real Bash flow on a terminal with scripted Gum answers."""
+        bin_dir = self.base / 'bin'
+        bin_dir.mkdir(exist_ok=True)
+        answers = self.base / 'answers.json'
+        answers.write_text(json.dumps(responses))
+        gum = bin_dir / 'gum'
+        gum.write_text(f"#!{sys.executable}\n" + r'''import json, os, sys
+from pathlib import Path
+if sys.argv[1] == 'style':
+    sys.exit(0)
+p = Path(os.environ['GUM_TEST_ANSWERS'])
+answers = json.loads(p.read_text())
+if not answers:
+    sys.exit(99)
+answer = answers.pop(0)
+p.write_text(json.dumps(answers))
+if answer is None:
+    sys.exit(130)
+print(answer)
+''')
+        gum.chmod(0o755)
+        env = dict(self.env, TERM='xterm-256color',
+                   PATH=str(bin_dir) + os.pathsep + self.env['PATH'],
+                   GUM_TEST_ANSWERS=str(answers))
+        master, slave = pty.openpty()
+        try:
+            process = subprocess.Popen([str(self.repo / 'install')], stdin=slave,
+                                       stdout=slave, stderr=slave, env=env)
+            try:
+                process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait()
+                raise
+        finally:
+            os.close(slave)
+            os.close(master)
+        self.assertEqual(process.returncode, 0)
+        self.assertEqual(json.loads(answers.read_text()), [])
+
+    def test_garden_stages_then_saves_and_preserves_partial_states(self):
+        self.run_install('--set', 'alpha=name-only')
+        self.run_garden(['Pick skills', 'alpha  [name-only]\nbeta  [off]',
+                         'Review & save', 'Save changes'])
+        self.assertEqual(self.states(), {'alpha': 'name-only', 'beta': 'on'})
+        self.assertTrue((self.claude_links / 'beta').is_symlink())
+
+    def test_garden_can_start_with_no_enabled_skills(self):
+        self.run_garden(['Pick skills', 'beta  [off]', 'Review & save', 'Save changes'])
+        self.assertEqual(self.states(), {'alpha': 'off', 'beta': 'on'})
+
+    def test_garden_discard_does_not_write_staged_edits(self):
+        self.run_garden(['Tune one skill', 'alpha  [off]', 'on — Fully visible',
+                         'Review & save', 'Keep tending', 'Leave without saving'])
+        self.assertFalse(self.settings.exists())
+        self.assertFalse(self.links.exists())
+
+    def test_garden_cancel_and_empty_selection_leave_state_untouched(self):
+        self.run_install('--add', 'alpha')
+        before = self.settings.read_bytes()
+        self.run_garden(['Pick skills', None, 'Pick skills', '', None])
+        self.assertEqual(self.settings.read_bytes(), before)
+        self.assertEqual(self.states(), {'alpha': 'on', 'beta': 'off'})
+
+    def test_garden_can_turn_off_last_skill(self):
+        self.run_install('--add', 'alpha')
+        self.run_garden(['Tune one skill', 'alpha  [on]', 'off — Put this one to bed',
+                         'Review & save', 'Save changes'])
+        self.assertEqual(self.states(), {'alpha': 'off', 'beta': 'off'})
+        self.assertFalse((self.claude_links / 'alpha').exists())
+
+    def test_redirected_output_has_no_ansi(self):
+        self.assertNotIn('\x1b', self.run_install('--list').stdout)
 
     def overrides(self):
         if not self.settings.exists():

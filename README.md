@@ -41,7 +41,21 @@ instructions.
 
 `--set` takes `on`, `off`, `name-only` (the model sees the name but not the description — cheaper context) or `user-invocable-only` (you can `/invoke` it, the model cannot reach for it on its own). `on` and `off` add or remove the link. The two partial states keep the link and write a Claude-specific `skillOverrides` entry in `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json`. `CLAUDE_CONFIG_DIR` selects both Claude’s settings directory and its skills directory. Real directories and files in either skills directory are never replaced or deleted.
 
-The picker uses `fzf` when it is installed and falls back to a numbered menu when it is not. In the `fzf` picker: `TAB` toggles without moving the cursor, `ctrl-a` selects all, `ctrl-d` selects none, `ENTER` confirms. Everything selected is linked and keeps any partial state it had; everything unselected is unlinked. Confirming an empty selection changes nothing. JSON edits go through `jq`, or `python3` if `jq` is missing.
+### The skill garden
+
+Install [Charm’s Gum](https://github.com/charmbracelet/gum) for the interactive garden:
+
+```sh
+brew install gum
+./install
+```
+
+- **Pick skills** opens a searchable multi-select with your enabled skills already marked. Type to search, use the arrow keys to move, `TAB` to toggle, and `ENTER` to stage your selection. Existing partial states are preserved.
+- **Tune one skill** lets you choose any of the four states directly, including turning off the last enabled skill.
+- **Review & save** shows the exact changes before writing them. Choose **Save changes** to apply them, or **Keep tending** to return.
+- **Leave without saving** discards your staged changes. `Ctrl+C` cancels a picker; at the garden menu it exits without saving. `ESC` in search first moves focus to the results. An empty bulk selection changes nothing.
+
+The garden uses Gum’s Bubble Tea interactions and Lip Gloss styling, with a live count of enabled skills and pending changes. Without Gum, the installer uses `fzf` or a numbered menu. In `fzf`, `TAB` toggles, `ctrl-a` selects all, `ctrl-d` selects none, and `ENTER` saves a nonempty selection. Command flags stay noninteractive. Redirected output is plain text, and `NO_COLOR` disables colour. JSON edits use `jq`, or `python3` when `jq` is unavailable.
 
 ### PR description preview
 
