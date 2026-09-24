@@ -44,7 +44,7 @@ The picker uses `fzf` when it is installed and falls back to a numbered menu whe
 
 ### PR description preview
 
-`/pr-draft` uses [a reusable body template](skills/pr-draft/assets/body.md) when the target repository has none. Preview a body file locally with Geist styling:
+`/pr-draft` describes the current working tree, committed or not, and renders the description as a local HTML page. It makes no Git or GitHub changes. It uses [a reusable body template](skills/pr-draft/assets/body.md) when the target repository has none. Preview a body file directly:
 
 ```sh
 pnpm install

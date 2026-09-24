@@ -1,6 +1,6 @@
 # A Draft PR description is jointly owned, via a Managed Block
 
-The `pr-draft` skill writes its generated description between `<!-- pr-draft:start -->` and `<!-- pr-draft:end -->`, and on update rewrites only what is between those markers.
+The `pr-draft` skill writes its generated description between `<!-- pr-draft:start -->` and `<!-- pr-draft:end -->`. The skill now only renders a local preview and leaves GitHub untouched; the markers remain so that any future tool that updates a live PR body rewrites only what is between them.
 
 A PR description is a conversation, not an artifact. Reviewers add context, authors add caveats, and someone pastes a screenshot. An agent that regenerates the whole body destroys all of it on every push, which trains people to stop writing there. The alternative — diffing the live body against a fresh generation and asking before overwriting — needs the agent to correctly judge which human edits are worth preserving, and it will get that wrong often enough to be untrustworthy.
 

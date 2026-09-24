@@ -29,7 +29,7 @@ _Avoid_: setting, flag, config
 ### Pull requests
 
 **Draft PR**:
-A pull request opened in GitHub's draft state. The first and default output of the `pr-draft` skill; it is never promoted to ready automatically.
+A pull request opened in GitHub's draft state. The `pr-draft` skill produces the description for one as a local HTML preview and Markdown file; opening the PR is the user's step.
 _Avoid_: WIP PR, PR draft, proposal
 
 **Managed Block**:
