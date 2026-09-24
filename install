@@ -2,7 +2,8 @@
 # Install and toggle the skills in this repo.
 #
 # A skill is "on" when ~/.agents/skills/<name> is a symlink into this
-# checkout, and "off" when that link is absent. The two partial states,
+# checkout, with a matching link in Claude’s skills directory. "Off" removes
+# both links. The two partial states,
 # name-only and user-invocable-only, keep the link and add a skillOverrides
 # entry in settings.json. See docs/adr/0003.
 set -euo pipefail
@@ -11,6 +12,7 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SRC_DIR="$REPO_DIR/skills"
 CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 LINK_DIR="$HOME/.agents/skills"
+CLAUDE_LINK_DIR="$CLAUDE_DIR/skills"
 SETTINGS="$CLAUDE_DIR/settings.json"
 STATES="$(mktemp -t skillstates)"
 BEFORE="$(mktemp -t skillstates-before)"
@@ -44,11 +46,12 @@ Usage: ./install [options]
 
   (no options)     Interactive: pick which skills are on.
   --list           Show each skill and its current state.
-  --add NAME       Link a skill into ~/.agents/skills. Repeatable.
-  --remove NAME    Remove a skill's link. Repeatable.
+  --add NAME       Link a skill into ~/.agents/skills and Claude skills. Repeatable.
+  --remove NAME    Remove a skill's links in both directories. Repeatable.
   --set NAME=STATE Set one skill's state directly. Repeatable.
   --sync           Repair links that point at an old checkout and drop links
-                   whose skill left the repo. Adds nothing. No prompts.
+                   whose skill left the repo. Fill missing Claude links for
+                   enabled skills. Enables no new skills. No prompts.
   --help
 
 States: on, off, name-only, user-invocable-only
@@ -133,27 +136,35 @@ is_linked() { # $1 = skill name -> 0 when ~/.agents/skills/<name> exists
   [ -e "$LINK_DIR/$1" ] || [ -L "$LINK_DIR/$1" ]
 }
 
-link_skill() { # $1 = skill name -> 0 when linked, 1 when a real directory blocks it
-  local name="$1" target="$LINK_DIR/$1"
-  mkdir -p "$LINK_DIR"
-  if [ -L "$target" ]; then
-    ln -sfn "$SRC_DIR/$name" "$target"
-  elif [ -e "$target" ]; then
-    warn "$name - a real directory is already there, not touching it"
-    return 1
-  else
-    ln -s "$SRC_DIR/$name" "$target"
-  fi
+link_skill() { # $1 = skill name -> link in both discovery directories
+  local name="$1" dir target blocked=0
+  for dir in "$LINK_DIR" "$CLAUDE_LINK_DIR"; do
+    target="$dir/$name"
+    mkdir -p "$dir"
+    if [ -L "$target" ]; then
+      ln -sfn "$SRC_DIR/$name" "$target"
+    elif [ -e "$target" ]; then
+      warn "$target - a real directory or file is already there, not touching it"
+      blocked=1
+    else
+      ln -s "$SRC_DIR/$name" "$target"
+    fi
+  done
+  return "$blocked"
 }
 
-unlink_skill() { # $1 = skill name -> 0 when absent afterwards, 1 when a real directory blocks it
-  local name="$1" target="$LINK_DIR/$1"
-  if [ -L "$target" ]; then
-    rm "$target"
-  elif [ -e "$target" ]; then
-    warn "$name - a real directory is there, not deleting it"
-    return 1
-  fi
+unlink_skill() { # $1 = skill name -> remove links in both discovery directories
+  local name="$1" dir target blocked=0
+  for dir in "$LINK_DIR" "$CLAUDE_LINK_DIR"; do
+    target="$dir/$name"
+    if [ -L "$target" ]; then
+      rm "$target"
+    elif [ -e "$target" ]; then
+      warn "$target - a real directory or file is there, not deleting it"
+      blocked=1
+    fi
+  done
+  return "$blocked"
 }
 
 apply_state() { # $1 name, $2 state -> links or unlinks, then records the result
@@ -194,7 +205,7 @@ show_list() {
     printf '  %s %-14s %s\n' "$(state_colour "$state")" "$name" "$(describe "$name")"
   done < "$STATES"
   printf '\n'
-  dim "  on, name-only and user-invocable-only are linked into $LINK_DIR; off is not"
+  dim "  on, name-only and user-invocable-only are linked into $LINK_DIR and $CLAUDE_LINK_DIR; off is not"
   printf '\n'
 }
 
@@ -345,23 +356,22 @@ case "$MODE" in
     ;;
   sync)
     printf '\n'
-    bold "Syncing links in $LINK_DIR"
+    bold "Syncing links in $LINK_DIR and $CLAUDE_LINK_DIR"
     while IFS=$'\t' read -r name state; do
       [ "$state" = "off" ] && continue
-      if [ -L "$LINK_DIR/$name" ] && [ "$(readlink "$LINK_DIR/$name")" != "$SRC_DIR/$name" ]; then
-        link_skill "$name" && printf '  relinked %s\n' "$name"
-      fi
+      link_skill "$name" && printf '  synced %s\n' "$name"
     done < "$STATES"
     # Links into this checkout whose skill no longer exists in the repo.
-    if [ -d "$LINK_DIR" ]; then
-      for target in "$LINK_DIR"/*; do
+    for dir in "$LINK_DIR" "$CLAUDE_LINK_DIR"; do
+      [ -d "$dir" ] || continue
+      for target in "$dir"/*; do
         [ -L "$target" ] || continue
         case "$(readlink "$target")" in "$SRC_DIR"/*) ;; *) continue ;; esac
         [ -e "$target" ] && continue
         rm "$target"
-        printf '  removed %s (no longer in the repo)\n' "$(basename "$target")"
+        printf '  removed %s (no longer in the repo)\n' "$target"
       done
-    fi
+    done
     write_overrides < "$STATES"
     show_list
     dim "Start a new Claude Code session for this to take effect."
