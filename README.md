@@ -75,6 +75,21 @@ It needs Python 3 and the same one-time `pnpm install`.
 | [`new-project`](skills/new-project/)   | Initialises tooling in an existing project or scaffolds a new one, inferred from the directory. |
 | [`web-research`](skills/web-research/) | Researches a question on the live web and opens the findings as a cited page. `/`-invoked only. |
 
+### Upstream skills
+
+This checkout also includes all 29 published skills from [Matt Pocock](https://github.com/mattpocock/skills) and [shadcn’s `improve`](https://github.com/shadcn/improve). Matt’s `in-progress` directory is excluded. Each skill includes its supporting files and upstream MIT license.
+
+These are editable snapshots under `skills/<name>/`, available through the same picker as the local skills. New skills stay off until selected:
+
+```sh
+./install                       # select the skills you want
+./install --add improve         # enable shadcn’s codebase advisor
+```
+
+[upstream-skills.json](upstream-skills.json) records the exact source commits and original paths. To update a snapshot, copy the full upstream skill directory and license, update its recorded commit, then run `./refresh <name>` and `./refresh --check <name>`.
+
+For Matt’s engineering workflow, enable `setup-matt-pocock-skills` and run `/setup-matt-pocock-skills` once in the target project to configure its issue tracker and documentation layout. Start a fresh agent session after enabling skills.
+
 ## Repo layout
 
 ```
