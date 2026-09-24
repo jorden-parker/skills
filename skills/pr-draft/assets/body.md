@@ -1,10 +1,11 @@
 ## What & why
 
-Explain the problem and resulting behavior in one paragraph. Link the issue when available.
+Explain the problem and resulting behavior in one paragraph. Link the issue when available. Name any PR or branch this depends on.
 
 ## Changes
 
 - Group changes by area, with enough detail for a reviewer to assess them.
+- **Remaining:** list work still to do when the branch is unfinished. Remove when nothing remains.
 
 ## Testing
 
