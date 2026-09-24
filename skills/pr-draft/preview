@@ -42,7 +42,8 @@ def main():
     parser.add_argument("--repo", type=Path, default=Path.cwd(),
                         help="Repository to search for a PR template (default: current directory)")
     parser.add_argument("--title", default="Draft pull request", help="PR title")
-    parser.add_argument("--output", required=True, type=Path, help="New HTML file to write")
+    parser.add_argument("--output", required=True, type=Path, help="HTML file to write")
+    parser.add_argument("--replace", action="store_true", help="Update an existing HTML preview")
     args = parser.parse_args()
 
     try:
@@ -63,7 +64,7 @@ def main():
         # One pass keeps placeholder-like text inside user content literal.
         pattern = "|".join(re.escape(key) for key in replacements)
         document = re.sub(pattern, lambda match: replacements[match.group()], template)
-        with args.output.open("x", encoding="utf-8") as output:
+        with args.output.open("w" if args.replace else "x", encoding="utf-8") as output:
             output.write(document)
     except (OSError, UnicodeError, ValueError) as error:
         parser.exit(1, f"preview: {error}\n")

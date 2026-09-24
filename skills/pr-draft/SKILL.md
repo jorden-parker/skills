@@ -1,6 +1,6 @@
 ---
 name: pr-draft
-description: Draft a pull request description for the current working tree and open it as a local HTML preview. Makes no Git or GitHub changes.
+description: Create or update the current branch's local PR draft and open its HTML preview. Makes no Git or GitHub changes.
 argument-hint: "optional: extra context, or a link to the issue/spec this implements"
 disable-model-invocation: true
 ---
@@ -70,7 +70,30 @@ Wrap the body in markers, so a later tool can find the generated block once it i
 <!-- pr-draft:end -->
 ```
 
-Write it to a new file such as `/tmp/pr-body-<branch>.md`.
+### Reuse the current branch's draft
+
+Each repository and branch has one local draft. On every invocation, resolve the same directory below; the shared Git directory identifies the project across linked worktrees, and the hash of the full branch name keeps branches distinct without filename collisions. Detached HEAD uses the commit ID instead.
+
+```sh
+DRAFT_DIR="$(python3 - <<'PY'
+import hashlib
+from pathlib import Path
+import subprocess
+
+def git(*args):
+    return subprocess.check_output(["git", *args], text=True).strip()
+
+common = Path(git("rev-parse", "--path-format=absolute", "--git-common-dir"))
+branch = git("rev-parse", "--abbrev-ref", "HEAD")
+identity = "branch:" + branch if branch != "HEAD" else "commit:" + git("rev-parse", "HEAD")
+directory = common / "pr-draft" / hashlib.sha256(identity.encode()).hexdigest()
+directory.mkdir(parents=True, exist_ok=True)
+print(directory)
+PY
+)"
+```
+
+Read any existing `body.md` in this directory before writing. Retain still-relevant user edits and context, reconcile them with the current diff and template, and update the title and body to describe the current work. Write the completed body to `$DRAFT_DIR/body.md`, replacing the previous version. Reuse a known older draft for this same repository and branch by moving it to this location on first use. Create a draft only when none exists for this repository and branch; repeated invocations update it, including across sessions.
 
 ## 3. Write the title
 
@@ -87,10 +110,10 @@ If those titles are Conventional Commits (`feat:`, `fix:`), follow suit. If they
 Run the bundled `preview` command with the body file and title. Resolve the executable relative to this skill's directory, even when working in another repository:
 
 ```sh
-<skill-directory>/preview /tmp/pr-body-<branch>.md --title "<title>" --output /tmp/pr-preview-<branch>.html
+<skill-directory>/preview "$DRAFT_DIR/body.md" --title "<title>" --output "$DRAFT_DIR/preview.html" --replace
 ```
 
-Choose an unused output path; the command preserves existing files. It requires Python 3 and a one-time `pnpm install` in this skills repository to install the renderer. It prints the generated file's absolute path and opens it in the default browser. If opening fails, report that and provide the path.
+Use this same output path on every invocation. `--replace` updates the existing preview; without it, the command preserves existing files. It requires Python 3 and a one-time `pnpm install` in this skills repository to install the renderer. It prints the generated file's absolute path and opens it in the default browser. If opening fails, report that and provide the path.
 
 The preview renders the whole description as HTML in [assets/preview.html](assets/preview.html), with headings, lists, tables, links, and a copy button on each code block. The markers stay in the Markdown and are invisible in the rendered page. Marked renders Markdown and DOMPurify sanitizes the HTML. Both libraries and the sibling [Geist](../geist/SKILL.md) token and type CSS are embedded, so rendering works offline in light and dark themes. Fonts load from Google Fonts with local fallbacks. Read the Geist skill before changing the preview's styling.
 
