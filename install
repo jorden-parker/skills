@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Install and toggle the skills in this repo.
 #
-# Skills are symlinked into ~/.claude/skills once. Turning one "off" does not
-# delete it - it writes a skillOverrides entry in settings.json, which is the
-# switch Claude Code actually ships. See docs/adr/0001.
+# A skill is "on" when ~/.claude/skills/<name> is a symlink into this
+# checkout, and "off" when that link is absent. The two partial states,
+# name-only and user-invocable-only, keep the link and add a skillOverrides
+# entry in settings.json. See docs/adr/0003.
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -13,12 +14,13 @@ LINK_DIR="$CLAUDE_DIR/skills"
 SETTINGS="$CLAUDE_DIR/settings.json"
 STATES="$(mktemp -t skillstates)"
 BEFORE="$(mktemp -t skillstates-before)"
-trap 'rm -f "$STATES" "$STATES.new" "$BEFORE"' EXIT
+trap 'rm -f "$STATES" "$STATES.new" "$STATES.apply" "$BEFORE"' EXIT
 
 VALID_STATES="on off name-only user-invocable-only"
 
 bold() { printf '\033[1m%s\033[0m\n' "$1"; }
 dim()  { printf '\033[2m%s\033[0m\n' "$1"; }
+warn() { printf '  \033[33mskip\033[0m %s\n' "$1"; }
 die()  { printf '\033[31merror:\033[0m %s\n' "$1" >&2; exit 1; }
 state_colour() { # $1 state -> coloured, padded to 19 columns
   local c
@@ -41,17 +43,19 @@ usage() {
 Usage: ./install [options]
 
   (no options)     Interactive: pick which skills are on.
-  --sync           Link any new skills, keep current states. No prompts.
   --list           Show each skill and its current state.
+  --add NAME       Link a skill into ~/.claude/skills. Repeatable.
+  --remove NAME    Remove a skill's link. Repeatable.
   --set NAME=STATE Set one skill's state directly. Repeatable.
-  --unlink NAME    Remove a skill's symlink entirely.
+  --sync           Repair links that point at an old checkout and drop links
+                   whose skill left the repo. Adds nothing. No prompts.
   --help
 
 States: on, off, name-only, user-invocable-only
-  on                    Fully visible to you and to Claude.
-  off                   Hidden everywhere.
-  name-only             Claude sees the name, not the description. Cheaper context.
-  user-invocable-only   You can /invoke it; Claude cannot reach for it itself.
+  on                    Linked. Fully visible to you and to Claude.
+  off                   Not linked. Hidden everywhere.
+  name-only             Linked. Claude sees the name, not the description.
+  user-invocable-only   Linked. You can /invoke it; Claude cannot reach for it itself.
 
 Adding or removing a skill needs a NEW Claude Code session to take effect.
 USAGE
@@ -80,7 +84,7 @@ PY
   fi
 }
 
-write_overrides() { # stdin: "name<TAB>state" lines, "on" entries are dropped
+write_overrides() { # stdin: "name<TAB>state" lines; "on" and "off" entries are removed
   local pairs; pairs="$(cat)"
   mkdir -p "$CLAUDE_DIR"
   [ -f "$SETTINGS" ] || echo '{}' > "$SETTINGS"
@@ -89,7 +93,7 @@ write_overrides() { # stdin: "name<TAB>state" lines, "on" entries are dropped
     printf '%s\n' "$pairs" \
       | jq -R -s 'split("\n") | map(select(length>0) | split("\t") | {(.[0]): .[1]}) | add // {}' \
       | jq -s '.[0] as $cur | .[1] as $new
-               | $cur + { skillOverrides: (($cur.skillOverrides // {}) + $new | with_entries(select(.value != "on"))) }
+               | $cur + { skillOverrides: (($cur.skillOverrides // {}) + $new | with_entries(select(.value != "on" and .value != "off"))) }
                | if (.skillOverrides | length) == 0 then del(.skillOverrides) else . end' \
         "$SETTINGS" - > "$SETTINGS.tmp"
   else
@@ -104,7 +108,7 @@ for line in pairs.split("\n"):
     if not line: continue
     k,_,v=line.partition("\t")
     ov[k]=v
-ov={k:v for k,v in ov.items() if v!="on"}
+ov={k:v for k,v in ov.items() if v not in ("on","off")}
 if ov: d["skillOverrides"]=ov
 else: d.pop("skillOverrides",None)
 json.dump(d,open(out,"w"),indent=2)
@@ -125,18 +129,41 @@ describe() { # $1 = skill name
   sed -n 's/^description: *//p' "$SRC_DIR/$1/SKILL.md" | head -1 | cut -c1-90
 }
 
-link_skill() {
+is_linked() { # $1 = skill name -> 0 when ~/.claude/skills/<name> exists
+  [ -e "$LINK_DIR/$1" ] || [ -L "$LINK_DIR/$1" ]
+}
+
+link_skill() { # $1 = skill name -> 0 when linked, 1 when a real directory blocks it
   local name="$1" target="$LINK_DIR/$1"
   mkdir -p "$LINK_DIR"
   if [ -L "$target" ]; then
     ln -sfn "$SRC_DIR/$name" "$target"
   elif [ -e "$target" ]; then
-    printf '  \033[33mskip\033[0m %s - a real directory is already there, not touching it\n' "$name"
+    warn "$name - a real directory is already there, not touching it"
     return 1
   else
     ln -s "$SRC_DIR/$name" "$target"
   fi
-  return 0
+}
+
+unlink_skill() { # $1 = skill name -> 0 when absent afterwards, 1 when a real directory blocks it
+  local name="$1" target="$LINK_DIR/$1"
+  if [ -L "$target" ]; then
+    rm "$target"
+  elif [ -e "$target" ]; then
+    warn "$name - a real directory is there, not deleting it"
+    return 1
+  fi
+}
+
+apply_state() { # $1 name, $2 state -> links or unlinks, then records the result
+  local name="$1" state="$2"
+  if [ "$state" = "off" ]; then
+    unlink_skill "$name" || state="on"
+  else
+    link_skill "$name" || true
+  fi
+  set_state "$name" "$state"
 }
 
 load_states() { # writes name<TAB>state for every skill in the repo
@@ -144,9 +171,12 @@ load_states() { # writes name<TAB>state for every skill in the repo
   : > "$STATES"
   while IFS= read -r name; do
     [ -n "$name" ] || continue
-    local state
-    state="$(printf '%s\n' "$overrides" | awk -F'\t' -v n="$name" '$1==n{print $2}' | head -1)"
-    [ -n "$state" ] || state="on"
+    local state="off"
+    if is_linked "$name"; then
+      state="$(printf '%s\n' "$overrides" | awk -F'\t' -v n="$name" '$1==n{print $2}' | head -1)"
+      case " $VALID_STATES " in *" $state "*) ;; *) state="on" ;; esac
+      [ "$state" = "off" ] && state="on"
+    fi
     printf '%s\t%s\n' "$name" "$state" >> "$STATES"
   done <<< "$(list_skills)"
 }
@@ -161,14 +191,10 @@ show_list() {
   bold "Skills in $REPO_DIR/skills"
   printf '\n'
   while IFS=$'\t' read -r name state; do
-    local mark link
-    link=" "
-    [ -L "$LINK_DIR/$name" ] && link="*"
-    mark="$(state_colour "$state")"
-    printf '  %s %s %-14s %s\n' "$link" "$mark" "$name" "$(describe "$name")"
+    printf '  %s %-14s %s\n' "$(state_colour "$state")" "$name" "$(describe "$name")"
   done < "$STATES"
   printf '\n'
-  dim "  * = linked into $LINK_DIR"
+  dim "  on, name-only and user-invocable-only are linked into $LINK_DIR; off is not"
   printf '\n'
 }
 
@@ -187,17 +213,24 @@ show_changes() { # diff $BEFORE against $STATES, one line per changed skill
   [ "$changed" -eq 1 ] || { printf '\n'; dim "No states changed."; }
 }
 
+save() { # apply every state in $STATES to the filesystem and settings.json
+  local name state
+  cp "$STATES" "$STATES.apply"
+  while IFS=$'\t' read -r name state; do apply_state "$name" "$state"; done < "$STATES.apply"
+  write_overrides < "$STATES"
+}
+
 # ---------- interactive ----------
 pick_with_fzf() {
   local sel binds i
-  # Pre-select the rows that are currently on, so the picker opens showing
+  # Pre-select the rows that are currently linked, so the picker opens showing
   # the real state. fzf has no per-row select flag; the load event walks the
   # rows by position instead. Positions are 1-based input line numbers.
   binds='load:'
   i=0
   while IFS=$'\t' read -r _ state; do
     i=$((i+1))
-    [ "$state" = "on" ] && binds="${binds}pos($i)+select+"
+    [ "$state" = "off" ] || binds="${binds}pos($i)+select+"
   done < "$STATES"
   binds="${binds}pos(1),tab:toggle,shift-tab:toggle,ctrl-a:select-all,ctrl-d:deselect-all"
 
@@ -207,18 +240,23 @@ pick_with_fzf() {
          | fzf --multi --ansi --with-nth=1,3 --delimiter='\t' \
                --marker='✓ ' --pointer='▸ ' \
                --color='marker:green,pointer:cyan' \
-               --header=$'✓ = on after ENTER, no mark = off.\nTAB toggles (cursor stays put), ctrl-a all, ctrl-d none, ENTER saves, ESC quits.' \
+               --header=$'✓ = linked after ENTER, no mark = link removed.\nTAB toggles (cursor stays put), ctrl-a all, ctrl-d none, ENTER saves, ESC quits.' \
                --preview="sed -n '1,25p' $SRC_DIR/{1}/SKILL.md" \
                --preview-window=right:60%:wrap \
                --bind="$binds" \
            | cut -f1)" || true
   if [ -z "$sel" ]; then
     printf '\nNothing selected - leaving states unchanged.\n'
-    printf 'To turn everything off, use: ./install --set NAME=off\n'
+    printf 'To remove everything, use: ./install --remove NAME\n'
     return 1
   fi
-  while IFS=$'\t' read -r name _; do
-    if printf '%s\n' "$sel" | grep -qx "$name"; then set_state "$name" "on"; else set_state "$name" "off"; fi
+  # Selected rows keep a partial state if they had one; unselected rows go off.
+  while IFS=$'\t' read -r name state; do
+    if printf '%s\n' "$sel" | grep -qx "$name"; then
+      [ "$state" = "off" ] && set_state "$name" "on"
+    else
+      set_state "$name" "off"
+    fi
   done < "$STATES"
   return 0
 }
@@ -270,9 +308,13 @@ while [ $# -gt 0 ]; do
     --help|-h) usage; exit 0 ;;
     --list|-l) MODE="list" ;;
     --sync)    MODE="sync" ;;
+    --add)     shift; SETS+=("${1:-}=on"); MODE="set" ;;
+    --add=*)   SETS+=("${1#--add=}=on"); MODE="set" ;;
+    --remove|--unlink)   shift; SETS+=("${1:-}=off"); MODE="set" ;;
+    --remove=*)          SETS+=("${1#--remove=}=off"); MODE="set" ;;
+    --unlink=*)          SETS+=("${1#--unlink=}=off"); MODE="set" ;;
     --set)     shift; SETS+=("${1:-}"); MODE="set" ;;
     --set=*)   SETS+=("${1#--set=}"); MODE="set" ;;
-    --unlink)  shift; MODE="unlink"; UNLINK_NAME="${1:-}" ;;
     *) die "unknown option: $1 (try --help)" ;;
   esac
   shift
@@ -287,26 +329,15 @@ case "$MODE" in
     show_list
     exit 0
     ;;
-  unlink)
-    [ -n "${UNLINK_NAME:-}" ] || die "--unlink needs a skill name"
-    if [ -L "$LINK_DIR/$UNLINK_NAME" ]; then
-      rm "$LINK_DIR/$UNLINK_NAME"
-      printf 'unlinked %s\n' "$UNLINK_NAME"
-      dim "Start a new Claude Code session for this to take effect."
-    else
-      die "$LINK_DIR/$UNLINK_NAME is not a symlink we manage"
-    fi
-    exit 0
-    ;;
   set)
     for pair in "${SETS[@]}"; do
       name="${pair%%=*}"; state="${pair#*=}"
+      [ -n "$name" ] && [ "$name" != "$pair" ] || die "expected NAME=STATE, got: $pair"
       grep -qx "$name" <<< "$(list_skills)" || die "no such skill: $name"
       case " $VALID_STATES " in *" $state "*) ;; *) die "bad state: $state (valid: $VALID_STATES)" ;; esac
-      link_skill "$name" || true
       set_state "$name" "$state"
     done
-    write_overrides < "$STATES"
+    save
     show_list
     show_changes
     dim "Start a new Claude Code session for this to take effect."
@@ -314,8 +345,23 @@ case "$MODE" in
     ;;
   sync)
     printf '\n'
-    bold "Linking skills into $LINK_DIR"
-    while IFS=$'\t' read -r name _; do link_skill "$name" && printf '  linked %s\n' "$name"; done < "$STATES"
+    bold "Syncing links in $LINK_DIR"
+    while IFS=$'\t' read -r name state; do
+      [ "$state" = "off" ] && continue
+      if [ -L "$LINK_DIR/$name" ] && [ "$(readlink "$LINK_DIR/$name")" != "$SRC_DIR/$name" ]; then
+        link_skill "$name" && printf '  relinked %s\n' "$name"
+      fi
+    done < "$STATES"
+    # Links into this checkout whose skill no longer exists in the repo.
+    if [ -d "$LINK_DIR" ]; then
+      for target in "$LINK_DIR"/*; do
+        [ -L "$target" ] || continue
+        case "$(readlink "$target")" in "$SRC_DIR"/*) ;; *) continue ;; esac
+        [ -e "$target" ] && continue
+        rm "$target"
+        printf '  removed %s (no longer in the repo)\n' "$(basename "$target")"
+      done
+    fi
     write_overrides < "$STATES"
     show_list
     dim "Start a new Claude Code session for this to take effect."
@@ -324,11 +370,7 @@ case "$MODE" in
 esac
 
 # interactive - refuse before touching anything if there is no terminal
-[ -t 0 ] || die "not a terminal - use --sync or --set instead"
-
-printf '\n'
-bold "Linking skills into $LINK_DIR"
-while IFS=$'\t' read -r name _; do link_skill "$name" >/dev/null && printf '  %s\n' "$name"; done < "$STATES"
+[ -t 0 ] || die "not a terminal - use --add, --remove, --set or --sync instead"
 
 if command -v fzf >/dev/null 2>&1; then
   pick_with_fzf || exit 0
@@ -337,7 +379,7 @@ else
   pick_with_menu || { printf 'no changes written\n'; exit 0; }
 fi
 
-write_overrides < "$STATES"
+save
 show_list
 show_changes
 printf '\n'

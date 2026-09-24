@@ -8,7 +8,7 @@ cd ~/src/skills
 ./install
 ```
 
-The installer symlinks every skill into `~/.claude/skills`, then records which ones are active in `~/.claude/settings.json`. Nothing is copied, so `git pull` updates a skill in place.
+The installer symlinks the skills you pick into `~/.claude/skills` and removes the links for the ones you turn off. Nothing is copied, so `git pull` updates a linked skill in place. Skills new to the repo stay off until you add them.
 
 **Adding or removing a skill needs a new Claude Code session.** Edits to an existing skill are picked up by `/reload-skills`.
 
@@ -17,9 +17,10 @@ The installer symlinks every skill into `~/.claude/skills`, then records which o
 ```sh
 ./install                    # pick which skills are on
 ./install --list             # show current state
-./install --sync             # link new skills, keep states, no prompts
-./install --set geist=off    # set one directly
-./install --unlink geist     # remove the symlink entirely
+./install --add geist        # link a skill
+./install --remove geist     # remove its link
+./install --set geist=name-only  # set a partial state directly
+./install --sync             # repair stale links, drop links to removed skills, no prompts
 ./refresh                   # refresh existing installations across agent apps
 ./refresh new-project       # refresh one skill
 ./refresh --check            # inspect without changing files
@@ -38,9 +39,9 @@ left untouched and reported for review. `--check` exits with status 1 when a
 refresh or review is needed. Use a fresh agent session if it already loaded old
 instructions.
 
-`--set` takes `on`, `off`, `name-only` (the model sees the name but not the description — cheaper context) or `user-invocable-only` (you can `/invoke` it, the model cannot reach for it on its own).
+`--set` takes `on`, `off`, `name-only` (the model sees the name but not the description — cheaper context) or `user-invocable-only` (you can `/invoke` it, the model cannot reach for it on its own). `on` and `off` add or remove the link. The two partial states keep the link and write a `skillOverrides` entry in `~/.claude/settings.json`. A real directory at `~/.claude/skills/<name>` is never replaced or deleted.
 
-The picker uses `fzf` when it is installed and falls back to a numbered menu when it is not. In the `fzf` picker: `TAB` toggles without moving the cursor, `ctrl-a` selects all, `ctrl-d` selects none, `ENTER` confirms. Everything selected is on; everything unselected is off. Confirming an empty selection changes nothing. JSON edits go through `jq`, or `python3` if `jq` is missing.
+The picker uses `fzf` when it is installed and falls back to a numbered menu when it is not. In the `fzf` picker: `TAB` toggles without moving the cursor, `ctrl-a` selects all, `ctrl-d` selects none, `ENTER` confirms. Everything selected is linked and keeps any partial state it had; everything unselected is unlinked. Confirming an empty selection changes nothing. JSON edits go through `jq`, or `python3` if `jq` is missing.
 
 ### PR description preview
 

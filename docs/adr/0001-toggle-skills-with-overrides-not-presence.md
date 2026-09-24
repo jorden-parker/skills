@@ -1,3 +1,5 @@
+**Superseded by [0003](0003-toggle-skills-by-presence-overrides-for-partial-states.md).**
+
 # Toggle skills with Overrides, not by adding and removing Links
 
 The installer links every skill in the repo into `~/.claude/skills` and then controls visibility through `skillOverrides` in `settings.json`, rather than creating a Link only for the skills you want and deleting the rest.
