@@ -1,8 +1,10 @@
 # Updating skills
 
 `skills/<name>/` is the source of truth. After updating a skill, run
-`./refresh <name>` and then `./refresh --check <name>` before reporting completion.
-Use `./refresh` without names to refresh all repo skills.
+`skills refresh <name>` and then `skills refresh --check <name>` before reporting
+completion. Use `skills refresh` without names to refresh all repo skills. Without
+the command on PATH, build it first: `go build -o bin/skills .` and use
+`./bin/skills --repo . refresh`.
 
 The command checks existing installations across agent apps, backs up recognised
 copies outside skill discovery directories, and links them to this checkout.

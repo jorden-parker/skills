@@ -26,6 +26,14 @@ _Avoid_: enabled, disabled, active
 The recorded entry that gives a skill a State other than `on`. Absence of an Override means `on`.
 _Avoid_: setting, flag, config
 
+**Repo**:
+The checkout of this repository that Links point into. The `skills` command finds it from `--repo`, `$SKILLS_REPO`, the path baked in at build time, or `~/src/skills`, in that order.
+_Avoid_: source, project, root
+
+**Refresh**:
+Replacing an installed copy of a skill with a Link, after backing the copy up. Only copies whose `SKILL.md` matches a version in the Repo's history are refreshed; anything else is reported for review.
+_Avoid_: update, migrate, relink
+
 ### Pull requests
 
 **Draft PR**:

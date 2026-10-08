@@ -1,3 +1,7 @@
 .DS_Store
 *.local
 node_modules
+/bin/
+/dist/
+__pycache__/
+*.pyc

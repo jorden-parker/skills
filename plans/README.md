@@ -9,6 +9,13 @@ findings by leverage without a user selection step; the findings table and
 the direction notes are at the bottom of this file so the maintainer can
 re-prioritise.
 
+On 2026-10-08 the Bash `install` and Python `refresh` scripts were replaced by
+the Go `skills` command (see `docs/adr/0004`). The `install:NN` line references
+in plans 003–008 and in the findings table below point at the deleted Bash
+script; read them against `git show 61fe94b:install`. Plans 003–005 are moot
+(the Go port has a test suite, works on Linux, and never replaces links it did
+not create).
+
 Execute in the order below. Each executor: read the plan fully before
 starting, honor its STOP conditions, and update your row when done.
 
