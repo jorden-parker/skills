@@ -98,6 +98,7 @@ It needs Python 3 and the same one-time `pnpm install`.
 | [`geist`](skills/geist/)               | Vercel's Geist Design System — real tokens, type scale, component recipes.                      |
 | [`new-project`](skills/new-project/)   | Initialises tooling in an existing project or scaffolds a new one, inferred from the directory. |
 | [`web-research`](skills/web-research/) | Researches a question on the live web and opens the findings as a cited page. `/`-invoked only. |
+| [`commit`](skills/commit/)             | Sorts changes into Conventional Commits as copyable commands on a local page. `/`-invoked only. |
 
 ### Upstream skills
 

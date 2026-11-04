@@ -6,7 +6,8 @@
     "doc": "docs"
   },
   "scripts": {
-    "prepare": "husky"
+    "prepare": "husky",
+    "test": "python3 -m unittest discover -s test -p 'test_*.py'"
   },
   "keywords": [],
   "author": "",

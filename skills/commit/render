@@ -1,0 +1,616 @@
+#!/usr/bin/env python3
+"""Check a commit plan against the working tree and write it as copyable Git commands on an HTML page."""
+
+import argparse
+from collections import Counter
+from dataclasses import dataclass
+import html
+import json
+import os
+from pathlib import Path
+import re
+import shlex
+import subprocess
+import sys
+import tempfile
+import webbrowser
+
+SKILL_DIRECTORY = Path(__file__).resolve().parent
+TEMPLATE_PATH = SKILL_DIRECTORY / "assets" / "page.html"
+GEIST_DIRECTORY = SKILL_DIRECTORY.parent / "geist"
+DEFAULT_TYPES = ["build", "chore", "ci", "docs", "feat", "fix", "perf", "refactor", "revert", "style", "test"]
+DEFAULT_HEADER_LIMIT = 72
+HEADER_PATTERN = re.compile(r"^(?P<type>[a-z]+)(\((?P<scope>[^)]+)\))?(?P<bang>!)?: (?P<subject>.+)$")
+PATCH_PATH_PATTERN = re.compile(r"^diff --git a/.+ b/(.+)$", re.MULTILINE)
+STATUS_FIELD_COUNTS = {"1": 9, "2": 10, "u": 11}
+TYPE_CLASSES = {"feat": "type-feat", "fix": "type-fix", "refactor": "type-refactor", "docs": "type-docs"}
+IGNORE_REASON = "Goes first so no later commit picks these files up, and they never appear in the history."
+PREP_REASON = "Some changes were already staged. This clears the staging area so each commit takes exactly the files listed. Your files on disk don't change."
+END_REASON = "After the last commit, <span class=\"mono\">git status</span> shows nothing to commit."
+
+
+class RenderError(Exception):
+    pass
+
+
+@dataclass
+class PlanContext:
+    plan: dict
+    commits: list
+    plan_dir: Path
+    changed: list
+    ignored: set
+
+
+@dataclass
+class Step:
+    kind: str
+    commit: dict
+    position: int
+    commands: str
+    changes: list
+    partial_paths: set
+
+
+def git(*arguments, env=None, stdin_text=None, ok_codes=(0,)):
+    result = subprocess.run(
+        ["git", *arguments], capture_output=True, text=True, input=stdin_text, env=env, check=False
+    )
+    if result.returncode not in ok_codes:
+        raise RenderError(f"git {arguments[0]} failed: {result.stderr.strip()}")
+    return result.stdout
+
+
+def git_path(name):
+    return Path(git("rev-parse", "--path-format=absolute", "--git-path", name).strip())
+
+
+def repository_root():
+    return Path(git("rev-parse", "--show-toplevel").strip())
+
+
+def scratch_environment(scratch, index_name, real_objects):
+    return {
+        **os.environ,
+        "GIT_INDEX_FILE": str(scratch / index_name),
+        "GIT_OBJECT_DIRECTORY": str(scratch / "objects"),
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES": str(real_objects),
+    }
+
+
+def commit_defaults():
+    return {"scope": None, "breaking": False, "body": "", "footers": [], "paths": [], "patch": None, "rationale": ""}
+
+
+def normalize_commit(commit):
+    if not isinstance(commit.get("type"), str) or not isinstance(commit.get("subject"), str):
+        raise RenderError("every commit needs a string type and subject")
+    normalized = {**commit_defaults(), **commit}
+    if not normalized["paths"] and not normalized["patch"]:
+        raise RenderError(f"commit '{normalized['subject']}' needs paths or a patch")
+    return normalized
+
+
+def normalize_ignore(ignore):
+    if ignore is None:
+        return None
+    if not ignore.get("patterns"):
+        raise RenderError("ignore needs at least one pattern")
+    return {
+        "subject": ignore.get("subject", "ignore local files"),
+        "patterns": ignore["patterns"],
+        "reasons": ignore.get("reasons", {}),
+        "untrack": ignore.get("untrack", []),
+    }
+
+
+def load_plan(plan_path):
+    plan = json.loads(plan_path.read_text(encoding="utf-8"))
+    if not isinstance(plan, dict) or "base" not in plan or not plan.get("commits"):
+        raise RenderError("plan.json needs base and a non-empty commits list")
+    return {
+        "base": plan["base"],
+        "commits": [normalize_commit(commit) for commit in plan["commits"]],
+        "ignore": normalize_ignore(plan.get("ignore")),
+        "excluded": plan.get("excluded", []),
+    }
+
+
+def ignore_commit(ignore):
+    return {**commit_defaults(), "type": "chore", "subject": ignore["subject"], "rationale": IGNORE_REASON, "ignore": ignore}
+
+
+def planned_commits(plan):
+    if plan["ignore"] is None:
+        return plan["commits"]
+    return [ignore_commit(plan["ignore"]), *plan["commits"]]
+
+
+def commit_header(commit):
+    scope = f"({commit['scope']})" if commit["scope"] else ""
+    bang = "!" if commit["breaking"] else ""
+    return f"{commit['type']}{scope}{bang}: {commit['subject']}"
+
+
+def rule_value(rules, name, fallback):
+    rule = rules.get(name)
+    if isinstance(rule, list) and len(rule) == 3:
+        return rule[2]
+    return fallback
+
+
+def read_json_config(repository):
+    package_json = repository / "package.json"
+    if package_json.is_file():
+        commitlint = json.loads(package_json.read_text(encoding="utf-8")).get("commitlint")
+        if commitlint is not None:
+            return commitlint
+    for name in (".commitlintrc", ".commitlintrc.json"):
+        if (repository / name).is_file():
+            return json.loads((repository / name).read_text(encoding="utf-8"))
+    return None
+
+
+def other_config_names(repository):
+    candidates = [*repository.glob("commitlint.config.*"), *repository.glob(".commitlintrc.*")]
+    return sorted(path.name for path in candidates if path.suffix != ".json")
+
+
+def read_convention(repository):
+    config = read_json_config(repository) or {}
+    for name in other_config_names(repository):
+        print(f"render: {name} is not JSON, so Conventional Commits defaults are used", file=sys.stderr)
+    rules = config.get("rules", {})
+    return {
+        "types": rule_value(rules, "type-enum", DEFAULT_TYPES),
+        "scopes": rule_value(rules, "scope-enum", None),
+        "header_limit": rule_value(rules, "header-max-length", DEFAULT_HEADER_LIMIT),
+    }
+
+
+def header_problems(commit, convention):
+    header = commit_header(commit)
+    match = HEADER_PATTERN.match(header)
+    if match is None:
+        return [f"not a Conventional Commit header: {header}"]
+    problems = []
+    if match["type"] not in convention["types"]:
+        problems.append(f"type '{match['type']}' is not allowed: {header}")
+    if match["scope"] and convention["scopes"] is not None and match["scope"] not in convention["scopes"]:
+        problems.append(f"scope '{match['scope']}' is not allowed: {header}")
+    if commit["subject"].endswith("."):
+        problems.append(f"subject ends with a full stop: {header}")
+    if len(header) > convention["header_limit"]:
+        problems.append(f"header is {len(header)} characters, over the limit of {convention['header_limit']}: {header}")
+    return problems
+
+
+def check_base(base):
+    resolved = git("rev-parse", "--verify", "--quiet", f"{base}^{{commit}}", ok_codes=(0, 1)).strip()
+    if not resolved:
+        raise RenderError(f"base {base} is not a commit")
+    head = git("rev-parse", "HEAD").strip()
+    if resolved != head:
+        raise RenderError(f"the plan was made at {resolved[:7]} but HEAD is {head[:7]}; run /commit again")
+
+
+def parse_status(output):
+    records = output.split("\0")
+    entries = []
+    position = 0
+    while position < len(records):
+        record = records[position]
+        position += 1
+        if record.startswith("? "):
+            entries.append(("??", record[2:]))
+        elif record[:1] in STATUS_FIELD_COUNTS:
+            fields = record.split(" ", STATUS_FIELD_COUNTS[record[0]] - 1)
+            entries.append((fields[1], fields[-1]))
+            if record[0] == "2":
+                entries.append((fields[1], records[position]))
+                position += 1
+    return entries
+
+
+def changed_status():
+    return parse_status(git("--no-optional-locks", "status", "--porcelain=v2", "-z", "--untracked-files=all"))
+
+
+def matched_paths(patterns, paths):
+    if not patterns or not paths:
+        return set()
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".excludes") as excludes:
+        excludes.write("\n".join(patterns) + "\n")
+        excludes.flush()
+        output = git(
+            "-c",
+            f"core.excludesFile={excludes.name}",
+            "check-ignore",
+            "--no-index",
+            "--stdin",
+            stdin_text="\n".join(paths) + "\n",
+            ok_codes=(0, 1),
+        )
+    return set(output.splitlines())
+
+
+def gitignore_text():
+    path = Path(".gitignore")
+    return path.read_text(encoding="utf-8") if path.is_file() else ""
+
+
+def ignore_problems(plan):
+    ignore = plan["ignore"]
+    if ignore is None:
+        return []
+    existing = {line.strip() for line in gitignore_text().splitlines()}
+    problems = [f"{pattern} is already in .gitignore" for pattern in ignore["patterns"] if pattern in existing]
+    tracked = matched_paths(ignore["patterns"], git("ls-files").splitlines())
+    problems += [f"{path} is tracked and matches a new pattern; add it to untrack" for path in sorted(tracked - set(ignore["untrack"]))]
+    problems += [f"{path} is in untrack but no tracked file matches a new pattern" for path in ignore["untrack"] if path not in tracked]
+    return problems
+
+
+def patch_file_paths(plan_dir, patch):
+    path = plan_dir / patch
+    if not path.is_file():
+        raise RenderError(f"patch file not found: {path}")
+    return PATCH_PATH_PATTERN.findall(path.read_text(encoding="utf-8"))
+
+
+def duplicated_items(items):
+    counts = Counter(items)
+    return sorted(item for item, count in counts.items() if count > 1)
+
+
+def coverage_problems(context):
+    claims = [path for commit in context.commits for path in commit["paths"]]
+    patched = [path for commit in context.commits if commit["patch"] for path in patch_file_paths(context.plan_dir, commit["patch"])]
+    excluded = {item["path"] for item in context.plan["excluded"]}
+    implicit = {".gitignore"} if context.plan["ignore"] else set()
+    covered = set(claims) | set(patched) | excluded | context.ignored | implicit
+    problems = [f"{path} is listed in more than one commit" for path in duplicated_items(claims)]
+    problems += [f"{path} is not in any commit, excluded, or ignored" for path in sorted(set(context.changed) - covered)]
+    problems += [f"{path} is in a commit but has no changes" for path in sorted(set(claims) - set(context.changed))]
+    return problems
+
+
+def plan_problems(context, convention):
+    problems = []
+    for commit in context.commits:
+        problems += header_problems(commit, convention)
+    problems += ignore_problems(context.plan)
+    problems += coverage_problems(context)
+    return problems
+
+
+def gitignore_with_rules(ignore):
+    current = gitignore_text()
+    if current and not current.endswith("\n"):
+        current += "\n"
+    return current + "".join(f"{pattern}\n" for pattern in ignore["patterns"])
+
+
+def stage_ignore_rules(ignore, environment):
+    blob = git("hash-object", "-w", "--stdin", stdin_text=gitignore_with_rules(ignore), env=environment).strip()
+    git("update-index", "--add", "--cacheinfo", f"100644,{blob},.gitignore", env=environment)
+    if ignore["untrack"]:
+        git("rm", "-r", "--cached", "-q", "--", *ignore["untrack"], env=environment)
+
+
+def apply_commit(commit, plan_dir, environment):
+    if commit.get("ignore"):
+        stage_ignore_rules(commit["ignore"], environment)
+    if commit["paths"]:
+        git("add", "-A", "--", *commit["paths"], env=environment)
+    if commit["patch"]:
+        git("apply", "--cached", str(plan_dir / commit["patch"]), env=environment)
+
+
+def replay(context, environment):
+    previous = git("rev-parse", "HEAD^{tree}").strip()
+    git("read-tree", "HEAD", env=environment)
+    states = []
+    for commit in context.commits:
+        apply_commit(commit, context.plan_dir, environment)
+        current = git("write-tree", env=environment).strip()
+        states.append((previous, current))
+        previous = current
+    return states
+
+
+def expected_tree(context, environment):
+    ignore = context.plan["ignore"]
+    git("read-tree", "HEAD", env=environment)
+    left_out = {item["path"] for item in context.plan["excluded"]} | context.ignored
+    if ignore:
+        left_out |= {".gitignore", *ignore["untrack"]}
+    relevant = [path for path in context.changed if path not in left_out]
+    if relevant:
+        git("add", "-A", "--", *relevant, env=environment)
+    if ignore:
+        stage_ignore_rules(ignore, environment)
+    return git("write-tree", env=environment).strip()
+
+
+def check_final_tree(final, expected, environment):
+    if final == expected:
+        return
+    differences = git("diff-tree", "-r", "--name-only", final, expected, env=environment).split()
+    raise RenderError("the commits do not reproduce the working tree; differing files: " + ", ".join(differences))
+
+
+def file_changes(previous, current, environment):
+    names = git("diff-tree", "-r", "--no-renames", "--name-status", previous, current, env=environment)
+    numbers = git("diff-tree", "-r", "--no-renames", "--numstat", previous, current, env=environment)
+    counts = {path: (added, deleted) for added, deleted, path in (line.split("\t") for line in numbers.splitlines())}
+    rows = []
+    for line in names.splitlines():
+        status, path = line.split("\t", 1)
+        added, deleted = counts.get(path, ("0", "0"))
+        rows.append({"status": status, "path": path, "added": to_count(added), "deleted": to_count(deleted)})
+    return rows
+
+
+def to_count(text):
+    return int(text) if text.isdigit() else 0
+
+
+def shell_word(text):
+    if any(character in text for character in "'\\\n"):
+        raise RenderError(f"cannot copy a path with a quote, backslash or newline into a shell command: {text!r}")
+    return shlex.quote(text)
+
+
+def continued_command(prefix, words):
+    if len(words) == 1:
+        return f"{prefix} {words[0]}"
+    lines = [f"{prefix} \\"]
+    for index, word in enumerate(words):
+        continuation = " \\" if index < len(words) - 1 else ""
+        lines.append(f"  {word}{continuation}")
+    return "\n".join(lines)
+
+
+def message_path(plan_dir, position):
+    return plan_dir / f"msg-{position:02d}.txt"
+
+
+def commit_commands(commit, position, plan_dir):
+    lines = []
+    if commit["paths"]:
+        lines.append(continued_command("git add -A --", [shell_word(path) for path in commit["paths"]]))
+    if commit["patch"]:
+        lines.append(f"git apply --cached {shell_word(str(plan_dir / commit['patch']))}")
+    lines.append(f"git commit -F {shell_word(str(message_path(plan_dir, position)))}")
+    return "\n".join(lines)
+
+
+def ignore_commands(ignore, position, plan_dir):
+    words = [shell_word(pattern) for pattern in ignore["patterns"]]
+    current = gitignore_text()
+    if current and not current.endswith("\n"):
+        words.insert(0, "''")
+    lines = [" ".join(["printf '%s\\n'", *words, ">> .gitignore"])]
+    if ignore["untrack"]:
+        lines.append(continued_command("git rm -r --cached --quiet --", [shell_word(path) for path in ignore["untrack"]]))
+    lines.append("git add .gitignore")
+    lines.append(f"git commit -F {shell_word(str(message_path(plan_dir, position)))}")
+    return "\n".join(lines)
+
+
+def commit_message(commit):
+    tail = "\n".join(commit["footers"])
+    parts = [commit_header(commit), commit["body"], tail]
+    return "\n\n".join(part for part in parts if part) + "\n"
+
+
+def write_messages(plan_dir, commits):
+    for position, commit in enumerate(commits, start=1):
+        message_path(plan_dir, position).write_text(commit_message(commit), encoding="utf-8")
+
+
+def build_steps(context, scratch, staged, real_objects):
+    replay_environment = scratch_environment(scratch, "replay-index", real_objects)
+    states = replay(context, replay_environment)
+    expected_environment = scratch_environment(scratch, "expected-index", real_objects)
+    check_final_tree(states[-1][1], expected_tree(context, expected_environment), replay_environment)
+    steps = []
+    if staged:
+        steps.append(Step("prep", None, 0, "git reset -q", [], set()))
+    for position, (commit, (previous, current)) in enumerate(zip(context.commits, states), start=1):
+        changes = file_changes(previous, current, replay_environment)
+        patched = set(patch_file_paths(context.plan_dir, commit["patch"])) if commit["patch"] else set()
+        partial = patched - set(commit["paths"])
+        if commit.get("ignore"):
+            commands = ignore_commands(commit["ignore"], position, context.plan_dir)
+        else:
+            commands = commit_commands(commit, position, context.plan_dir)
+        steps.append(Step("ignore" if commit.get("ignore") else "commit", commit, position, commands, changes, partial))
+    return steps
+
+
+def escape(text):
+    return html.escape(str(text))
+
+
+def highlight_commands(commands):
+    lines = []
+    for line in commands.split("\n"):
+        if line.startswith(" "):
+            lines.append(escape(line))
+        else:
+            lines.append(f'<span class="command-prompt">$ </span>{escape(line)}')
+    return "\n".join(lines)
+
+
+def copy_block(pre_html, copy_text, step_copy=False):
+    marker = " data-step-copy" if step_copy else ""
+    return (
+        f'<div class="command-block"><pre>{pre_html}</pre>'
+        f'<button class="copy-button" data-copy="{escape(copy_text)}"{marker}>Copy</button></div>'
+    )
+
+
+def message_disclosure(commit):
+    message = commit_message(commit)
+    return f'<details class="disclosure"><summary>Message only, for a Git app</summary>{copy_block(escape(message), message)}</details>'
+
+
+def file_list(changes, partial_paths):
+    rows = []
+    for change in changes:
+        note = ' <span class="partial-note">some changes only</span>' if change["path"] in partial_paths else ""
+        deleted = f'<span class="count-deleted">-{change["deleted"]}</span>' if change["deleted"] else ""
+        rows.append(
+            f'<li><span>{escape(change["status"])}</span>'
+            f'<span><span class="file-path">{escape(change["path"])}</span>{note}</span>'
+            f'<span><span class="count-added">+{change["added"]}</span>{deleted}</span></li>'
+        )
+    return f'<ul class="file-list">{"".join(rows)}</ul>'
+
+
+def ignore_rules_html(ignore, ignored):
+    rows = []
+    for pattern in ignore["patterns"]:
+        hidden = sorted(matched_paths([pattern], sorted(ignored)))
+        hides = f", hides {', '.join(escape(path) for path in hidden)}" if hidden and hidden != [pattern] else ""
+        reason = escape(ignore["reasons"].get(pattern, ""))
+        rows.append(
+            f'<li><span>+</span><span><span class="file-path">{escape(pattern)}</span> '
+            f'<span class="rule-reason">{reason}{hides}</span></span><span></span></li>'
+        )
+    rules = f'<p class="list-caption">Added to .gitignore</p><ul class="file-list">{"".join(rows)}</ul>'
+    if not ignore["untrack"]:
+        return rules
+    untracked = "".join(f'<li><span>-</span><span><span class="file-path">{escape(path)}</span> <span class="partial-note rule-reason">kept on disk, removed from Git</span></span><span></span></li>' for path in ignore["untrack"])
+    return rules + f'<p class="list-caption">Removed from Git</p><ul class="file-list">{untracked}</ul>'
+
+
+def commit_card(step, total, files_html):
+    commit = step.commit
+    tail = "\n\n".join(part for part in (commit["body"], "\n".join(commit["footers"])) if part)
+    body = f'<p class="entry-body">{escape(tail)}</p>' if tail else ""
+    type_class = TYPE_CLASSES.get(commit["type"], "")
+    header = commit_header(commit)
+    return (
+        f'<li class="graph-entry {type_class}" data-step>'
+        '<span class="node" aria-hidden="true"></span>'
+        f'<p class="entry-meta"><span>Commit {step.position} of {total}</span></p>'
+        f'<h2 class="entry-header"><span class="type-word">{escape(commit["type"])}</span>{escape(header[len(commit["type"]):])}</h2>'
+        f"{body}"
+        f'<p class="entry-reason">{escape(commit["rationale"])}</p>'
+        f"{files_html}"
+        f"{copy_block(highlight_commands(step.commands), step.commands, step_copy=True)}"
+        f"{message_disclosure(commit)}"
+        "</li>"
+    )
+
+
+def step_html(step, total, ignored):
+    if step.kind == "prep":
+        return (
+            '<li class="graph-entry type-prep" data-step><span class="node" aria-hidden="true"></span>'
+            '<p class="entry-meta"><span>Before you start</span></p>'
+            "<p class=\"entry-header\">Unstage what's already staged</p>"
+            f'<p class="entry-reason secondary">{escape(PREP_REASON)}</p>'
+            f"{copy_block(highlight_commands(step.commands), step.commands, step_copy=True)}"
+            "</li>"
+        )
+    if step.kind == "ignore":
+        return commit_card(step, total, ignore_rules_html(step.commit["ignore"], ignored))
+    return commit_card(step, total, file_list(step.changes, step.partial_paths))
+
+
+def base_html(plan):
+    short, subject = git("log", "-1", "--format=%h %s", plan["base"]).strip().split(" ", 1)
+    return (
+        '<li class="graph-entry"><span class="node node-base" aria-hidden="true"></span>'
+        f'<p class="entry-meta"><span>Current commit</span><span class="mono">{escape(short)}</span></p>'
+        f'<p class="entry-header secondary">{escape(subject)}</p></li>'
+    )
+
+
+def end_html():
+    return (
+        '<li class="graph-entry"><span class="node node-end" aria-hidden="true"></span>'
+        '<p class="entry-header">Working tree clean</p>'
+        f'<p class="entry-reason secondary">{END_REASON}</p></li>'
+    )
+
+
+def left_out_html(excluded):
+    if not excluded:
+        return ""
+    items = "".join(f'<li><span class="mono">{escape(item["path"])}</span> {escape(item["reason"])}</li>' for item in excluded)
+    return f'<section class="left-out"><h2>Left out</h2><ul>{items}</ul></section>'
+
+
+def render_page(context, steps, repository, ignored):
+    total = len(context.commits)
+    graph = base_html(context.plan) + "".join(step_html(step, total, ignored) for step in steps) + end_html()
+    branch = git("rev-parse", "--abbrev-ref", "HEAD").strip()
+    noun = "commit" if total == 1 else "commits"
+    all_commands = "\n".join(step.commands for step in steps)
+    values = {
+        "{{TITLE}}": escape(f"{total} {noun} for {repository.name}"),
+        "{{SUMMARY}}": escape(f"Run these in order on {branch}. Nothing has been staged or committed yet; this page only shows the commands."),
+        "{{PROGRESS}}": escape(f"{len(steps)} steps to run"),
+        "{{ALL_COMMANDS}}": escape(all_commands),
+        "{{GRAPH}}": graph,
+        "{{LEFT_OUT}}": left_out_html(context.plan["excluded"]),
+        "{{GEIST_TOKENS}}": (GEIST_DIRECTORY / "geist-tokens.css").read_text(encoding="utf-8"),
+        "{{GEIST_TYPE}}": (GEIST_DIRECTORY / "geist-type.css").read_text(encoding="utf-8"),
+    }
+    pattern = "|".join(re.escape(key) for key in values)
+    template = TEMPLATE_PATH.read_text(encoding="utf-8")
+    return re.sub(pattern, lambda match: values[match.group()], template)
+
+
+def render_plan(plan_path, output_path, open_browser):
+    plan = load_plan(plan_path)
+    repository = repository_root()
+    os.chdir(repository)
+    check_base(plan["base"])
+    convention = read_convention(repository)
+    commits = planned_commits(plan)
+    status = changed_status()
+    changed = [path for _, path in status]
+    ignored = matched_paths(plan["ignore"]["patterns"], changed) if plan["ignore"] else set()
+    context = PlanContext(plan, commits, plan_path.parent, changed, ignored)
+    problems = plan_problems(context, convention)
+    if problems:
+        raise RenderError("\n".join(problems))
+    staged = any(code[0] not in ".?" for code, _ in status)
+    real_objects = git_path("objects")
+    with tempfile.TemporaryDirectory(prefix="commit-plan-") as scratch_name:
+        scratch = Path(scratch_name)
+        (scratch / "objects").mkdir()
+        steps = build_steps(context, scratch, staged, real_objects)
+        page = render_page(context, steps, repository, ignored)
+    write_messages(context.plan_dir, commits)
+    output_path.write_text(page, encoding="utf-8")
+    if open_browser and not webbrowser.open(output_path.as_uri()):
+        print(f"render: browser could not open {output_path}", file=sys.stderr)
+    return output_path
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("plan", type=Path, help="plan.json written by the commit skill")
+    parser.add_argument("--output", type=Path, help="HTML file to write (default: index.html beside the plan)")
+    parser.add_argument("--no-open", action="store_true", help="write the page without opening it")
+    args = parser.parse_args()
+    plan_path = args.plan.resolve()
+    output_path = args.output.resolve() if args.output else plan_path.parent / "index.html"
+    try:
+        page = render_plan(plan_path, output_path, not args.no_open)
+    except (OSError, ValueError, RenderError) as error:
+        print(f"render: {error}", file=sys.stderr)
+        return 1
+    print(page)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

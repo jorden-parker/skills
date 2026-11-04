@@ -48,6 +48,12 @@ _Avoid_: generated section, agent block
 The branch a Draft PR merges into, taken from the repository's default branch.
 _Avoid_: target, trunk, upstream
 
+### Commits
+
+**Commit Plan**:
+The ordered list of Conventional Commits the `commit` skill proposes for a working tree, stored as `plan.json` in the Git directory. The user applies it; the skill never does.
+_Avoid_: commit draft, staging plan
+
 ### Design
 
 **Design System Present**:
