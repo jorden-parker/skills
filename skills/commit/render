@@ -452,11 +452,6 @@ def copy_block(pre_html, copy_text, step_copy=False):
     )
 
 
-def message_disclosure(commit):
-    message = commit_message(commit)
-    return f'<details class="disclosure"><summary>Message only, for a Git app</summary>{copy_block(escape(message), message)}</details>'
-
-
 def file_list(changes, partial_paths):
     rows = []
     for change in changes:
@@ -497,12 +492,14 @@ def commit_card(step, total, files_html):
         f'<li class="graph-entry {type_class}" data-step>'
         '<span class="node" aria-hidden="true"></span>'
         f'<p class="entry-meta"><span>Commit {step.position} of {total}</span></p>'
+        '<div class="entry-title">'
         f'<h2 class="entry-header"><span class="type-word">{escape(commit["type"])}</span>{escape(header[len(commit["type"]):])}</h2>'
+        f'<button class="copy-button" data-copy="{escape(commit_message(commit))}" aria-label="Copy commit message">Copy</button>'
+        "</div>"
         f"{body}"
         f'<p class="entry-reason">{escape(commit["rationale"])}</p>'
         f"{files_html}"
         f"{copy_block(highlight_commands(step.commands), step.commands, step_copy=True)}"
-        f"{message_disclosure(commit)}"
         "</li>"
     )
 
@@ -557,6 +554,7 @@ def render_page(context, steps, repository, ignored):
         "{{SUMMARY}}": escape(f"Run these in order on {branch}. Nothing has been staged or committed yet; this page only shows the commands."),
         "{{PROGRESS}}": escape(f"{len(steps)} steps to run"),
         "{{ALL_COMMANDS}}": escape(all_commands),
+        "{{BASE}}": escape(context.plan["base"]),
         "{{GRAPH}}": graph,
         "{{LEFT_OUT}}": left_out_html(context.plan["excluded"]),
         "{{GEIST_TOKENS}}": (GEIST_DIRECTORY / "geist-tokens.css").read_text(encoding="utf-8"),

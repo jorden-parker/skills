@@ -102,6 +102,22 @@ class HappyPathTest(RenderTestCase):
         self.assertEqual((self.plan_dir / "msg-01.txt").read_text(encoding="utf-8"), "feat(cli): add --dry-run flag\n\nWhy.\n\nRefs: #42\n")
 
 
+class CopyButtonTest(RenderTestCase):
+    def test_header_copy_button_copies_the_full_message(self):
+        self.write("cli.py", "run\n")
+        self.render({"commits": [self.commit("add --dry-run flag", ["cli.py"], scope="cli", body="Why.", footers=["Refs: #42"], rationale="r")]})
+        page = self.page()
+        button = re.search(r'<button class="copy-button" data-copy="([^"]*)" aria-label="Copy commit message">', page)
+        self.assertIsNotNone(button)
+        self.assertEqual(html.unescape(button.group(1)), (self.plan_dir / "msg-01.txt").read_text(encoding="utf-8"))
+        self.assertNotIn("Message only", page)
+
+    def test_page_carries_the_base_commit_for_saved_progress(self):
+        self.write("cli.py", "run\n")
+        self.render({"commits": [self.commit("add flag", ["cli.py"], rationale="r")]})
+        self.assertIn(f'data-base="{self.base}"', self.page())
+
+
 class CoverageTest(RenderTestCase):
     def test_a_changed_file_in_no_commit_is_named_and_rejected(self):
         self.write("README.md", "changed\n")

@@ -52,8 +52,7 @@ Set `PLAN_DIR` to `$(git rev-parse --absolute-git-dir)/commit-plan` and create i
          "scope": "cli",
          "breaking": false,
          "subject": "add --dry-run flag",
-         "body": "Why the change was made, wrapped at 72.",
-         "footers": ["Refs: #42"],
+         "body": "",
          "paths": ["internal/cli/run.go", "internal/cli/run_test.go"],
          "patch": null,
          "rationale": "One line shown on the card: why these files belong together."
@@ -65,8 +64,8 @@ Set `PLAN_DIR` to `$(git rev-parse --absolute-git-dir)/commit-plan` and create i
 
    - `ignore` is optional. Omit it when nothing needs ignoring. `render` turns it into the first commit, `chore: <subject>`.
    - `paths` lists whole files. `patch` is a diff file name inside `PLAN_DIR`; use it when a commit takes only some hunks of a file. A commit may have both.
-   - `breaking: true` adds `!` to the header. Add a `BREAKING CHANGE: ...` footer too when the change needs explaining.
-   - Message bodies are plain text with no attribution lines.
+   - `breaking: true` adds `!` to the header. Never add footers (no `BREAKING CHANGE:`, `Refs:`, trailers).
+   - The message is the header `<type>[optional scope]: <description>`. Leave `body` empty unless the change is very complex and the header cannot carry the why; then keep it short plain text, wrapped at 72, no attribution lines.
 
 7. **Render.** Run `<skill-directory>/render "$PLAN_DIR/plan.json"` from the repository root. It checks the plan against the working tree, replays every commit in a temporary index, and writes the HTML page. It prints the page path and opens it. If it fails, fix the plan and run it again. Never hand the user a plan that failed.
 

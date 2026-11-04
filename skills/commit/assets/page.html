@@ -289,20 +289,14 @@
         user-select: none;
       }
 
-      .disclosure {
-        margin-top: 8px;
-        font-size: 13px;
+      .entry-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
       }
-      .disclosure summary {
-        cursor: pointer;
+      .entry-title .copy-button {
+        height: 24px;
         color: var(--ds-gray-900);
-        width: fit-content;
-      }
-      .disclosure summary:hover {
-        color: var(--ds-gray-1000);
-      }
-      .disclosure .command-block {
-        margin-top: 8px;
       }
 
       .left-out {
@@ -360,7 +354,7 @@
     <main>
       <h1 class="text-heading-32 page-title">{{TITLE}}</h1>
       <p class="text-copy-16 secondary page-summary">{{SUMMARY}}</p>
-      <ol class="graph" id="graph">
+      <ol class="graph" id="graph" data-base="{{BASE}}">
         {{GRAPH}}
       </ol>
       {{LEFT_OUT}}
@@ -369,6 +363,24 @@
       const steps = [...document.querySelectorAll("[data-step]")];
       const graph = document.getElementById("graph");
       const progress = document.getElementById("progress-text");
+
+      const storageKey = "commit-plan:" + graph.dataset.base;
+
+      function loadProgress() {
+        try {
+          const saved = JSON.parse(localStorage.getItem(storageKey) || "[]");
+          saved.forEach((index) => steps[index]?.classList.add("copied"));
+        } catch {}
+      }
+
+      function saveProgress() {
+        const copiedIndexes = steps.flatMap((step, index) =>
+          step.classList.contains("copied") ? [index] : []
+        );
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(copiedIndexes));
+        } catch {}
+      }
 
       function renderProgress() {
         const copied = steps.filter((step) =>
@@ -379,6 +391,7 @@
             ? `${steps.length} steps to run`
             : `${copied} of ${steps.length} steps copied`;
         graph.classList.toggle("complete", copied === steps.length);
+        saveProgress();
       }
 
       async function copyText(text) {
@@ -415,7 +428,15 @@
           button.closest("[data-step]").classList.add("copied");
         }
         renderProgress();
+        if (button.hasAttribute("data-step-copy")) {
+          steps
+            .find((step) => !step.classList.contains("copied"))
+            ?.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
       });
+
+      loadProgress();
+      renderProgress();
 
       document.getElementById("toggle-theme").addEventListener("click", () => {
         const root = document.documentElement;
