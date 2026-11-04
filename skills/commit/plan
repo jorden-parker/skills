@@ -2,7 +2,9 @@
 """Build the commit skill's plan.json one entry at a time."""
 
 import argparse
+import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -23,8 +25,21 @@ def git_output(*arguments):
     return result.stdout.strip()
 
 
+def plan_dir():
+    git_dir = git_output("rev-parse", "--absolute-git-dir")
+    branch = git_output("rev-parse", "--abbrev-ref", "HEAD")
+    identity = branch if branch != "HEAD" else git_output("rev-parse", "HEAD")
+    repo_key = hashlib.sha256(f"{git_dir}\n{identity}".encode()).hexdigest()[:16]
+    base = Path(os.environ.get("SKILLS_TMPDIR") or "/tmp/claude-skills")
+    directory = base / "commit" / repo_key
+    base.mkdir(mode=0o700, parents=True, exist_ok=True)
+    for level in (base / "commit", directory):
+        level.mkdir(mode=0o700, exist_ok=True)
+    return directory
+
+
 def plan_path():
-    return Path(git_output("rev-parse", "--absolute-git-dir")) / "commit-plan" / "plan.json"
+    return plan_dir() / "plan.json"
 
 
 def load():
@@ -51,6 +66,10 @@ def parse_header(header):
         "breaking": bool(match["bang"]),
         "subject": match["subject"],
     }
+
+
+def handle_dir(arguments):
+    print(plan_dir())
 
 
 def handle_new(arguments):
@@ -92,6 +111,7 @@ def handle_exclude(arguments):
 def build_parser():
     parser = argparse.ArgumentParser(description=__doc__)
     subcommands = parser.add_subparsers(dest="command", required=True)
+    subcommands.add_parser("dir", help="print the plan directory").set_defaults(handler=handle_dir)
     subcommands.add_parser("new", help="start an empty plan at HEAD").set_defaults(handler=handle_new)
 
     commit = subcommands.add_parser("commit", help="append a commit")

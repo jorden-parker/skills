@@ -4,6 +4,7 @@
 import argparse
 from datetime import date
 import html
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -172,8 +173,10 @@ def main():
                 output.write(document)
             path = args.output.resolve()
         else:
-            directory = Path(tempfile.gettempdir()) / "artifacts"
-            directory.mkdir(parents=True, exist_ok=True)
+            base = Path(os.environ.get("SKILLS_TMPDIR") or "/tmp/claude-skills")
+            directory = base / "artifacts"
+            base.mkdir(mode=0o700, parents=True, exist_ok=True)
+            directory.mkdir(mode=0o700, exist_ok=True)
             with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=directory, prefix=f"{slug(args.title)}-",
                                              suffix=".html", delete=False) as output:
                 output.write(document)

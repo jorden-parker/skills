@@ -72,22 +72,27 @@ Wrap the body in markers, so a later tool can find the generated block once it i
 
 ### Reuse the current branch's draft
 
-Each repository and branch has one local draft. On every invocation, resolve the same directory below; the shared Git directory identifies the project across linked worktrees, and the hash of the full branch name keeps branches distinct without filename collisions. Detached HEAD uses the commit ID instead.
+Each repository and branch has one local draft. On every invocation, resolve the same directory below; the hash of the Git directory and the full branch name keeps repositories, worktrees and branches distinct. Detached HEAD uses the commit ID instead. Drafts live under `/tmp/claude-skills` (or `$SKILLS_TMPDIR`), never inside the repository.
 
 ```sh
 DRAFT_DIR="$(python3 - <<'PY'
 import hashlib
+import os
 from pathlib import Path
 import subprocess
 
 def git(*args):
     return subprocess.check_output(["git", *args], text=True).strip()
 
-common = Path(git("rev-parse", "--path-format=absolute", "--git-common-dir"))
+git_dir = git("rev-parse", "--absolute-git-dir")
 branch = git("rev-parse", "--abbrev-ref", "HEAD")
 identity = "branch:" + branch if branch != "HEAD" else "commit:" + git("rev-parse", "HEAD")
-directory = common / "pr-draft" / hashlib.sha256(identity.encode()).hexdigest()
-directory.mkdir(parents=True, exist_ok=True)
+repo_key = hashlib.sha256(f"{git_dir}\n{identity}".encode()).hexdigest()[:16]
+base = Path(os.environ.get("SKILLS_TMPDIR") or "/tmp/claude-skills")
+base.mkdir(mode=0o700, parents=True, exist_ok=True)
+(base / "pr-draft").mkdir(mode=0o700, exist_ok=True)
+directory = base / "pr-draft" / repo_key
+directory.mkdir(mode=0o700, exist_ok=True)
 print(directory)
 PY
 )"

@@ -11,7 +11,7 @@ Produce one thing: a commit plan for the current working tree, shown as an HTML 
 
 This skill reads only. It never stages, commits, amends or pushes, and it never edits `.git/index`. Do not run `git add`, `git commit`, `git reset` or `git stash` here, and do not run `git status` without `--no-optional-locks`.
 
-Set `PLAN_DIR` to `$(git rev-parse --absolute-git-dir)/commit-plan` and create it. Everything the skill writes goes there, not in the tree.
+Set `PLAN_DIR="$(<skill-directory>/plan dir)"`. It creates the directory under `/tmp/claude-skills/commit/` (or `$SKILLS_TMPDIR`). Everything the skill writes goes there, not in the tree or the git dir.
 
 ## Steps
 

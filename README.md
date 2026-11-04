@@ -12,6 +12,10 @@ The command symlinks the skills you pick into both `~/.agents/skills` and `${CLA
 
 **Adding or removing a skill needs a new Claude Code session.** Edits to an existing skill are picked up by `/reload-skills`.
 
+## Where skills write
+
+Skills write only under `/tmp/claude-skills` (mode 700), never into the repository or its git dir: `commit/<repo-key>/`, `pr-draft/<repo-key>/`, `artifacts/` and `handoff/`. `<repo-key>` hashes the git dir and branch, so repos, worktrees and branches stay apart. Set `SKILLS_TMPDIR` to use another base, as the tests do.
+
 ## Commands
 
 ```sh
@@ -73,7 +77,7 @@ Saving writes the links and `settings.json`, keeps a `.bak` of the previous sett
 
 ```sh
 pnpm install
-./skills/pr-draft/preview /tmp/pr-body.md --title "Cache the resolved config" --output /tmp/pr-preview.html
+./skills/pr-draft/preview /tmp/claude-skills/pr-draft/pr-body.md --title "Cache the resolved config" --output /tmp/claude-skills/pr-draft/pr-preview.html
 ```
 
 The draft follows the target repository's PR template, preserving its sections and checklists. Pass the completed body to preview it. Omit the body path to preview the local repository's template, using `--repo <path>` when outside that repository; the bundled template is the fallback when none exists. If several templates exist, pass the chosen file explicitly.

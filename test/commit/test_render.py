@@ -29,8 +29,11 @@ class RenderTestCase(unittest.TestCase):
         self.git("commit", "-q", "-m", "chore: start")
         self.base = self.git("rev-parse", "HEAD").strip()
         self.git_dir = Path(self.git("rev-parse", "--absolute-git-dir").strip())
-        self.plan_dir = self.git_dir / "commit-plan"
-        self.plan_dir.mkdir()
+        environment = {**os.environ, "SKILLS_TMPDIR": str(Path(temporary.name, "skills-tmp"))}
+        plan_command = Path(__file__).resolve().parents[2] / "skills" / "commit" / "plan"
+        printed = subprocess.run([str(plan_command), "dir"], cwd=self.repo, capture_output=True, text=True, check=True, env=environment)
+        self.plan_dir = Path(printed.stdout.strip()).resolve()
+        self.assertNotIn(str(self.git_dir), str(self.plan_dir))
 
     def git(self, *arguments):
         result = subprocess.run(["git", *arguments], cwd=self.repo, capture_output=True, text=True, check=False)

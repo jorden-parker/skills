@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -22,8 +23,8 @@ class PlanTestCase(unittest.TestCase):
         self.git("add", "README.md")
         self.git("commit", "-q", "-m", "chore: start")
         self.head = self.git("rev-parse", "HEAD").strip()
-        git_dir = Path(self.git("rev-parse", "--absolute-git-dir").strip())
-        self.plan_file = git_dir / "commit-plan" / "plan.json"
+        self.git_dir = Path(self.git("rev-parse", "--absolute-git-dir").strip())
+        self.skills_tmpdir = Path(temporary.name, "skills-tmp")
 
     def git(self, *arguments):
         result = subprocess.run(["git", *arguments], cwd=self.repo, capture_output=True, text=True, check=False)
@@ -32,13 +33,28 @@ class PlanTestCase(unittest.TestCase):
         return result.stdout
 
     def run_tool(self, tool, *arguments):
-        return subprocess.run([str(tool), *arguments], cwd=self.repo, capture_output=True, text=True, check=False)
+        environment = {**os.environ, "SKILLS_TMPDIR": str(self.skills_tmpdir)}
+        return subprocess.run([str(tool), *arguments], cwd=self.repo, capture_output=True, text=True, check=False, env=environment)
 
     def plan(self, *arguments):
         return self.run_tool(PLAN, *arguments)
 
+    @property
+    def plan_file(self):
+        return Path(self.plan("dir").stdout.strip(), "plan.json")
+
     def saved(self):
         return json.loads(self.plan_file.read_text(encoding="utf-8"))
+
+    def test_plan_lives_outside_the_git_dir(self):
+        before = sorted(str(path) for path in self.git_dir.rglob("*"))
+        result = self.plan("new")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        directory = self.plan("dir").stdout.strip()
+        self.assertEqual(result.stdout.strip(), directory + "/plan.json")
+        self.assertTrue(directory.startswith(str(self.skills_tmpdir / "commit") + "/"))
+        self.assertEqual(sorted(str(path) for path in self.git_dir.rglob("*")), before)
+        self.assertEqual((self.skills_tmpdir / "commit").stat().st_mode & 0o777, 0o700)
 
     def test_new_records_head_and_empty_commits(self):
         result = self.plan("new")
