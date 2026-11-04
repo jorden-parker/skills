@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the commit skill's plan.json one entry at a time."""
+"""Gather repo state for the commit skill, then build and render its plan."""
 
 import argparse
 import hashlib
@@ -12,6 +12,7 @@ import sys
 
 HEADER_PATTERN = re.compile(r"^(?P<type>[a-z]+)(\((?P<scope>[^)]+)\))?(?P<bang>!)?: (?P<subject>.+)$")
 DEFAULT_IGNORE_SUBJECT = "ignore local files"
+MAX_UNTRACKED_BYTES = 100 * 1024
 
 
 class PlanError(Exception):
@@ -42,18 +43,9 @@ def plan_path():
     return plan_dir() / "plan.json"
 
 
-def load():
-    path = plan_path()
-    if not path.exists():
-        raise PlanError("run `plan new` first")
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
 def save(plan):
     path = plan_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(plan, indent=2) + "\n", encoding="utf-8")
-    print(path)
 
 
 def parse_header(header):
@@ -68,82 +60,126 @@ def parse_header(header):
     }
 
 
-def handle_dir(arguments):
-    print(plan_dir())
+def section(title, body):
+    return f"## {title}\n{body.strip()}\n"
 
 
-def handle_new(arguments):
-    save({"base": git_output("rev-parse", "HEAD"), "commits": []})
+def commitlint_config():
+    parts = []
+    for path in sorted([*Path(".").glob(".commitlintrc*"), *Path(".").glob("commitlint.config.*")]):
+        parts.append(f"{path}\n{path.read_text(encoding='utf-8')}")
+    package = Path("package.json")
+    if package.exists():
+        embedded = json.loads(package.read_text(encoding="utf-8")).get("commitlint")
+        if embedded:
+            parts.append(f"package.json#commitlint\n{json.dumps(embedded, indent=2)}")
+    return "\n".join(parts)
 
 
-def handle_commit(arguments):
-    if not arguments.paths and not arguments.patch:
-        raise PlanError("commit needs PATH or --patch")
-    commit = {
-        **parse_header(arguments.header),
-        "body": arguments.body,
-        "paths": arguments.paths,
-        "patch": arguments.patch,
-        "rationale": arguments.why,
+def untracked_contents():
+    names = git_output("ls-files", "--others", "--exclude-standard").splitlines()
+    shown, skipped = [], []
+    for name in names:
+        path = Path(name)
+        raw = path.read_bytes() if path.is_file() and path.stat().st_size <= MAX_UNTRACKED_BYTES else None
+        if raw is None or b"\0" in raw:
+            skipped.append(name)
+        else:
+            shown.append(f"### {name}\n{raw.decode('utf-8', errors='replace')}")
+    if skipped:
+        shown.append("skipped (binary or over 100 KB): " + ", ".join(skipped))
+    return "\n".join(shown)
+
+
+def handle_gather(arguments):
+    status = git_output("--no-optional-locks", "status", "--porcelain=v2", "--untracked-files=all")
+    if not status:
+        print("nothing to commit")
+        return
+    gitignore = Path(".gitignore")
+    sections = [
+        ("commitlint config", commitlint_config()),
+        ("recent subjects", git_output("log", "--format=%s", "-30")),
+        (".gitignore", gitignore.read_text(encoding="utf-8") if gitignore.exists() else ""),
+        ("status", status),
+        ("diff stat", git_output("diff", "HEAD", "--stat")),
+        ("diff", git_output("diff", "HEAD")),
+        ("untracked files", untracked_contents()),
+    ]
+    print("\n".join(section(title, body) for title, body in sections if body))
+
+
+def commit_entry(raw, position, directory):
+    if not raw.get("paths") and not raw.get("patch"):
+        raise PlanError(f"commit {position} needs paths or patch")
+    patch_name = None
+    if raw.get("patch"):
+        patch_name = f"patch-{position:02d}.diff"
+        (directory / patch_name).write_text(raw["patch"], encoding="utf-8")
+    return {
+        **parse_header(raw.get("header", "")),
+        "body": raw.get("body", ""),
+        "paths": raw.get("paths", []),
+        "patch": patch_name,
+        "rationale": raw.get("why", ""),
     }
-    plan = load()
-    plan["commits"].append(commit)
+
+
+def ignore_entry(raw):
+    patterns = raw.get("patterns", {})
+    return {
+        "subject": raw.get("subject") or DEFAULT_IGNORE_SUBJECT,
+        "patterns": list(patterns),
+        "reasons": patterns,
+        "untrack": raw.get("untrack", []),
+    }
+
+
+def read_build_document():
+    try:
+        document = json.load(sys.stdin)
+    except json.JSONDecodeError as error:
+        raise PlanError(f"stdin is not valid JSON: {error}")
+    if not isinstance(document, dict) or not document.get("commits"):
+        raise PlanError("JSON needs a non-empty commits list")
+    return document
+
+
+def handle_build(arguments):
+    document = read_build_document()
+    directory = plan_dir()
+    plan = {
+        "base": git_output("rev-parse", "HEAD"),
+        "commits": [commit_entry(raw, position, directory) for position, raw in enumerate(document["commits"], 1)],
+    }
+    if document.get("ignore"):
+        plan["ignore"] = ignore_entry(document["ignore"])
+    if document.get("excluded"):
+        plan["excluded"] = document["excluded"]
     save(plan)
-
-
-def handle_ignore(arguments):
-    plan = load()
-    block = plan.setdefault("ignore", {"subject": DEFAULT_IGNORE_SUBJECT, "patterns": [], "reasons": {}, "untrack": []})
-    block["patterns"].append(arguments.pattern)
-    block["reasons"][arguments.pattern] = arguments.reason
-    block["untrack"].extend(arguments.untrack)
-    if arguments.subject:
-        block["subject"] = arguments.subject
-    save(plan)
-
-
-def handle_exclude(arguments):
-    plan = load()
-    plan.setdefault("excluded", []).append({"path": arguments.path, "reason": arguments.reason})
-    save(plan)
+    render = [sys.executable, str(Path(__file__).resolve().parent / "render"), str(plan_path())]
+    if arguments.no_open:
+        render.append("--no-open")
+    return subprocess.run(render, check=False).returncode
 
 
 def build_parser():
     parser = argparse.ArgumentParser(description=__doc__)
     subcommands = parser.add_subparsers(dest="command", required=True)
-    subcommands.add_parser("dir", help="print the plan directory").set_defaults(handler=handle_dir)
-    subcommands.add_parser("new", help="start an empty plan at HEAD").set_defaults(handler=handle_new)
-
-    commit = subcommands.add_parser("commit", help="append a commit")
-    commit.add_argument("header")
-    commit.add_argument("--why", required=True)
-    commit.add_argument("--body", default="")
-    commit.add_argument("--patch")
-    commit.add_argument("paths", nargs="*")
-    commit.set_defaults(handler=handle_commit)
-
-    ignore = subcommands.add_parser("ignore", help="add an ignore pattern")
-    ignore.add_argument("pattern")
-    ignore.add_argument("--reason", required=True)
-    ignore.add_argument("--subject")
-    ignore.add_argument("--untrack", nargs="+", default=[])
-    ignore.set_defaults(handler=handle_ignore)
-
-    exclude = subcommands.add_parser("exclude", help="leave a path out of the plan")
-    exclude.add_argument("path")
-    exclude.add_argument("--reason", required=True)
-    exclude.set_defaults(handler=handle_exclude)
+    subcommands.add_parser("gather", help="print what is needed to plan commits").set_defaults(handler=handle_gather)
+    build = subcommands.add_parser("build", help="read plan JSON on stdin, write plan.json and render the page")
+    build.add_argument("--no-open", action="store_true")
+    build.set_defaults(handler=handle_build)
     return parser
 
 
 def main():
     arguments = build_parser().parse_args()
     try:
-        arguments.handler(arguments)
+        return arguments.handler(arguments) or 0
     except PlanError as error:
         print(f"plan: {error}", file=sys.stderr)
         return 1
-    return 0
 
 
 if __name__ == "__main__":
