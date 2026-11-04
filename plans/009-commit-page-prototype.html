@@ -1,0 +1,1482 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Commit plan for skills (prototype)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* Geist Design System tokens.
+ * Extracted from the live vercel.com/geist stylesheets (computed values,
+ * light + dark), not transcribed by eye. See SKILL.md for provenance.
+ *
+ * Theme resolution:
+ *   :root                                  -> light
+ *   prefers-color-scheme: dark             -> dark, unless [data-theme="light"]
+ *   [data-theme="dark"] / [data-theme="light"] -> explicit override, wins both ways
+ */
+
+      :root {
+        color-scheme: light dark;
+
+        /* Fonts. Geist ships via `npm i geist` or the Google Fonts CSS2 API. */
+        --ds-font-sans:
+          Geist, Inter, -apple-system, "system-ui", "Segoe UI", Roboto, Oxygen,
+          Ubuntu, Cantarell, "Fira Sans", "Helvetica Neue", sans-serif;
+        --ds-font-mono:
+          "Geist Mono", Menlo, Monaco, "Lucida Console", "Liberation Mono",
+          "DejaVu Sans Mono", "Courier New", monospace;
+
+        /* Radii. Geist calls these "materials"; these are the radius halves. */
+        --ds-radius-base: 6px;
+        --ds-radius-small: 6px;
+        --ds-radius-medium: 12px;
+        --ds-radius-large: 12px;
+        --ds-radius-tooltip: 6px;
+        --ds-radius-menu: 12px;
+        --ds-radius-modal: 12px;
+        --ds-radius-fullscreen: 16px;
+
+        /* Control sizes */
+        --ds-size-small: 32px;
+        --ds-size-medium: 36px;
+        --ds-size-large: 40px;
+
+        /* Layout */
+        --ds-page-width: 1400px;
+        --ds-page-width-with-margin: calc(1400px + calc(2 * 24px));
+
+        /* Z-index */
+        --ds-z-drawer: 200;
+        --ds-z-modal: 300;
+        --ds-z-menu: 2001;
+        --ds-z-toast: 5000;
+        --ds-z-tooltip: 99999;
+
+        /* Motion */
+        --ds-motion-timing-swift: cubic-bezier(0.175, 0.885, 0.32, 1.1);
+        --ds-motion-overlay-duration: 0.3s;
+        --ds-motion-popover-duration: 0.2s;
+
+        --ds-black: #000;
+        --ds-white: #fff;
+
+        /* ---- Light theme ---- */
+        --ds-background-100: hsla(0, 0%, 100%, 1);
+        --ds-background-200: hsla(0, 0%, 98%, 1);
+
+        --ds-gray-100: hsla(0, 0%, 95%, 1);
+        --ds-gray-200: hsla(0, 0%, 92%, 1);
+        --ds-gray-300: hsla(0, 0%, 90%, 1);
+        --ds-gray-400: hsla(0, 0%, 92%, 1);
+        --ds-gray-500: hsla(0, 0%, 79%, 1);
+        --ds-gray-600: hsla(0, 0%, 66%, 1);
+        --ds-gray-700: hsla(0, 0%, 56%, 1);
+        --ds-gray-800: hsla(0, 0%, 49%, 1);
+        --ds-gray-900: hsla(0, 0%, 30%, 1);
+        --ds-gray-1000: hsla(0, 0%, 9%, 1);
+
+        --ds-gray-alpha-100: #0000000d;
+        --ds-gray-alpha-200: #00000014;
+        --ds-gray-alpha-300: #0000001a;
+        --ds-gray-alpha-400: #00000014;
+        --ds-gray-alpha-500: #00000036;
+        --ds-gray-alpha-600: #00000057;
+        --ds-gray-alpha-700: #00000070;
+        --ds-gray-alpha-800: #00000082;
+        --ds-gray-alpha-900: #000000b3;
+        --ds-gray-alpha-1000: #000000e8;
+
+        --ds-blue-100: oklch(97.32% 0.0141 251.56);
+        --ds-blue-200: oklch(96.29% 0.0195 250.59);
+        --ds-blue-300: oklch(94.58% 0.0293 249.849);
+        --ds-blue-400: oklch(91.58% 0.0473 245.116);
+        --ds-blue-500: oklch(82.75% 0.0979 248.48);
+        --ds-blue-600: oklch(73.08% 0.1583 248.133);
+        --ds-blue-700: oklch(57.61% 0.2508 258.23);
+        --ds-blue-800: oklch(51.51% 0.2399 257.85);
+        --ds-blue-900: oklch(53.18% 0.2399 256.99);
+        --ds-blue-1000: oklch(26.67% 0.1099 254.34);
+
+        --ds-red-100: oklch(96.5% 0.0223 13.09);
+        --ds-red-200: oklch(95.41% 0.0299 14.2526);
+        --ds-red-300: oklch(94.33% 0.0369 15.0115);
+        --ds-red-400: oklch(91.51% 0.0471 19.8);
+        --ds-red-500: oklch(84.47% 0.1018 17.71);
+        --ds-red-600: oklch(71.12% 0.1881 21.22);
+        --ds-red-700: oklch(62.56% 0.2524 23.03);
+        --ds-red-800: oklch(58.19% 0.2482 25.15);
+        --ds-red-900: oklch(54.99% 0.232 25.29);
+        --ds-red-1000: oklch(24.8% 0.1041 18.86);
+
+        --ds-amber-100: oklch(97.48% 0.0331 85.79);
+        --ds-amber-200: oklch(96.81% 0.0495 90.2423);
+        --ds-amber-300: oklch(95.93% 0.0636 90.52);
+        --ds-amber-400: oklch(91.02% 0.1322 88.25);
+        --ds-amber-500: oklch(86.55% 0.1583 79.63);
+        --ds-amber-600: oklch(80.25% 0.1953 73.59);
+        --ds-amber-700: oklch(81.87% 0.1969 76.46);
+        --ds-amber-800: oklch(77.21% 0.1991 64.28);
+        --ds-amber-900: oklch(52.79% 0.1496 54.65);
+        --ds-amber-1000: oklch(30.83% 0.099 45.48);
+
+        --ds-green-100: oklch(97.59% 0.0289 145.42);
+        --ds-green-200: oklch(96.92% 0.037 147.15);
+        --ds-green-300: oklch(94.6% 0.0674 144.23);
+        --ds-green-400: oklch(91.49% 0.0976 146.24);
+        --ds-green-500: oklch(85.45% 0.1627 146.3);
+        --ds-green-600: oklch(80.25% 0.214 145.18);
+        --ds-green-700: oklch(64.58% 0.1746 147.27);
+        --ds-green-800: oklch(57.81% 0.1507 147.5);
+        --ds-green-900: oklch(51.75% 0.1453 147.65);
+        --ds-green-1000: oklch(29.15% 0.1197 147.38);
+
+        --ds-teal-100: oklch(97.72% 0.0359 186.7);
+        --ds-teal-200: oklch(97.06% 0.0347 180.66);
+        --ds-teal-300: oklch(94.92% 0.0478 182.07);
+        --ds-teal-400: oklch(92.76% 0.0718 183.78);
+        --ds-teal-500: oklch(86.88% 0.1344 182.42);
+        --ds-teal-600: oklch(81.5% 0.161 178.96);
+        --ds-teal-700: oklch(64.92% 0.1572 181.95);
+        --ds-teal-800: oklch(57.53% 0.1392 181.66);
+        --ds-teal-900: oklch(52.08% 0.1251 182.93);
+        --ds-teal-1000: oklch(32.11% 0.0788 179.82);
+
+        --ds-purple-100: oklch(96.65% 0.0244 312.189);
+        --ds-purple-200: oklch(96.73% 0.0228 309.8);
+        --ds-purple-300: oklch(94.85% 0.0364 310.15);
+        --ds-purple-400: oklch(91.77% 0.0614 312.82);
+        --ds-purple-500: oklch(81.26% 0.1409 310.8);
+        --ds-purple-600: oklch(72.07% 0.2083 308.19);
+        --ds-purple-700: oklch(55.5% 0.3008 306.12);
+        --ds-purple-800: oklch(48.58% 0.2638 305.73);
+        --ds-purple-900: oklch(47.18% 0.2579 304);
+        --ds-purple-1000: oklch(23.96% 0.13 305.66);
+
+        --ds-pink-100: oklch(95.69% 0.0359 344.622);
+        --ds-pink-200: oklch(95.71% 0.0321 353.14);
+        --ds-pink-300: oklch(93.83% 0.0451 356.29);
+        --ds-pink-400: oklch(91.12% 0.0573 358.82);
+        --ds-pink-500: oklch(84.28% 0.0915 356.99);
+        --ds-pink-600: oklch(74.33% 0.1547 0.24);
+        --ds-pink-700: oklch(63.52% 0.238 1.01);
+        --ds-pink-800: oklch(59.51% 0.2339 4.21);
+        --ds-pink-900: oklch(53.5% 0.2058 2.84);
+        --ds-pink-1000: oklch(26% 0.0977 359);
+
+        --ds-focus-color: oklch(57.61% 0.2508 258.23);
+        --ds-focus-ring:
+          0 0 0 2px hsla(0, 0%, 100%, 1), 0 0 0 4px oklch(57.61% 0.2508 258.23);
+        --ds-focus-ring-outline: 2px solid oklch(57.61% 0.2508 258.23);
+
+        --ds-shadow-border: 0 0 0 1px #00000014;
+        --ds-shadow-border-inset: inset 0 0 0 1px #00000014;
+        --ds-shadow-small: 0px 2px 2px #0000000a;
+        --ds-shadow-medium: 0px 2px 2px #0000000a, 0px 8px 8px -8px #0000000a;
+        --ds-shadow-large: 0px 2px 2px #0000000a, 0px 8px 16px -4px #0000000a;
+        --ds-shadow-tooltip:
+          0 0 0 1px #00000014, 0px 1px 1px #00000005, 0px 4px 8px #0000000a;
+        --ds-shadow-menu:
+          0 0 0 1px #00000014, 0px 1px 1px #00000005,
+          0px 4px 8px -4px #0000000a, 0px 16px 24px -8px #0000000f;
+        --ds-shadow-modal:
+          0 0 0 1px #00000014, 0px 1px 1px #00000005,
+          0px 8px 16px -4px #0000000a, 0px 24px 32px -8px #0000000f;
+      }
+
+      /* ---- Dark theme ---- */
+      /* Applied twice on purpose: once for the system preference (unless the page
+ * explicitly opts into light), once for an explicit [data-theme="dark"] so a
+ * manual toggle wins in both directions. Values are identical. */
+
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+          --ds-background-100: hsla(0, 0%, 4%, 1);
+          --ds-background-200: hsla(0, 0%, 0%, 1);
+
+          --ds-gray-100: hsla(0, 0%, 10%, 1);
+          --ds-gray-200: hsla(0, 0%, 12%, 1);
+          --ds-gray-300: hsla(0, 0%, 16%, 1);
+          --ds-gray-400: hsla(0, 0%, 18%, 1);
+          --ds-gray-500: hsla(0, 0%, 27%, 1);
+          --ds-gray-600: hsla(0, 0%, 53%, 1);
+          --ds-gray-700: hsla(0, 0%, 56%, 1);
+          --ds-gray-800: hsla(0, 0%, 49%, 1);
+          --ds-gray-900: hsla(0, 0%, 63%, 1);
+          --ds-gray-1000: hsla(0, 0%, 93%, 1);
+
+          --ds-gray-alpha-100: #ffffff0f;
+          --ds-gray-alpha-200: #ffffff17;
+          --ds-gray-alpha-300: #ffffff21;
+          --ds-gray-alpha-400: #ffffff24;
+          --ds-gray-alpha-500: #ffffff3d;
+          --ds-gray-alpha-600: #ffffff82;
+          --ds-gray-alpha-700: #ffffff8a;
+          --ds-gray-alpha-800: #ffffff78;
+          --ds-gray-alpha-900: #ffffff9c;
+          --ds-gray-alpha-1000: #ffffffeb;
+
+          --ds-blue-100: oklch(22.17% 0.069 259.89);
+          --ds-blue-200: oklch(25.45% 0.0811 255.8);
+          --ds-blue-300: oklch(30.86% 0.1022 255.21);
+          --ds-blue-400: oklch(34.1% 0.121 254.74);
+          --ds-blue-500: oklch(38.5% 0.1403 254.4);
+          --ds-blue-600: oklch(64.94% 0.1982 251.813);
+          --ds-blue-700: oklch(57.61% 0.2321 258.23);
+          --ds-blue-800: oklch(51.51% 0.2307 257.85);
+          --ds-blue-900: oklch(71.7% 0.1648 250.794);
+          --ds-blue-1000: oklch(96.75% 0.0179 242.423);
+
+          --ds-red-100: oklch(22.1% 0.0657 15.11);
+          --ds-red-200: oklch(25.93% 0.0834 19.02);
+          --ds-red-300: oklch(31.47% 0.1105 20.96);
+          --ds-red-400: oklch(35.27% 0.1273 21.23);
+          --ds-red-500: oklch(40.68% 0.1479 23.16);
+          --ds-red-600: oklch(62.56% 0.2277 23.03);
+          --ds-red-700: oklch(62.56% 0.2234 23.03);
+          --ds-red-800: oklch(58.01% 0.227 25.12);
+          --ds-red-900: oklch(69.96% 0.2136 22.03);
+          --ds-red-1000: oklch(95.6% 0.0293 6.61);
+
+          --ds-amber-100: oklch(22.46% 0.0538 76.04);
+          --ds-amber-200: oklch(24.95% 0.0642 64.78);
+          --ds-amber-300: oklch(32.34% 0.0837 63.83);
+          --ds-amber-400: oklch(35.53% 0.0903 66.2971);
+          --ds-amber-500: oklch(41.55% 0.1044 67.98);
+          --ds-amber-600: oklch(75.04% 0.1737 74.49);
+          --ds-amber-700: oklch(81.87% 0.1969 76.46);
+          --ds-amber-800: oklch(77.21% 0.1991 64.28);
+          --ds-amber-900: oklch(77.21% 0.1991 64.28);
+          --ds-amber-1000: oklch(96.7% 0.0418 84.59);
+
+          --ds-green-100: oklch(23.09% 0.0716 149.68);
+          --ds-green-200: oklch(27.12% 0.0895 150.09);
+          --ds-green-300: oklch(29.84% 0.096 149.25);
+          --ds-green-400: oklch(34.39% 0.1039 147.78);
+          --ds-green-500: oklch(44.19% 0.1484 147.2);
+          --ds-green-600: oklch(58.11% 0.1815 146.55);
+          --ds-green-700: oklch(64.58% 0.199 147.27);
+          --ds-green-800: oklch(57.81% 0.1776 147.5);
+          --ds-green-900: oklch(73.1% 0.2158 148.29);
+          --ds-green-1000: oklch(96.76% 0.056 154.18);
+
+          --ds-teal-100: oklch(22.1% 0.0544 178.74);
+          --ds-teal-200: oklch(25.06% 0.062 178.76);
+          --ds-teal-300: oklch(31.5% 0.0767 180.99);
+          --ds-teal-400: oklch(32.43% 0.0763 180.13);
+          --ds-teal-500: oklch(43.35% 0.1055 180.97);
+          --ds-teal-600: oklch(60.71% 0.1485 180.24);
+          --ds-teal-700: oklch(64.92% 0.1403 181.95);
+          --ds-teal-800: oklch(57.53% 0.1392 181.66);
+          --ds-teal-900: oklch(74.56% 0.1765 182.8);
+          --ds-teal-1000: oklch(96.46% 0.056 180.29);
+
+          --ds-purple-100: oklch(22.34% 0.0779 316.87);
+          --ds-purple-200: oklch(25.91% 0.0921 314.41);
+          --ds-purple-300: oklch(31.98% 0.1219 312.41);
+          --ds-purple-400: oklch(35.93% 0.1504 309.78);
+          --ds-purple-500: oklch(40.99% 0.1721 307.92);
+          --ds-purple-600: oklch(55.5% 0.2191 306.12);
+          --ds-purple-700: oklch(55.5% 0.2186 306.12);
+          --ds-purple-800: oklch(48.58% 0.2102 305.73);
+          --ds-purple-900: oklch(69.87% 0.2037 309.51);
+          --ds-purple-1000: oklch(96.1% 0.0304 316.46);
+
+          --ds-pink-100: oklch(22.67% 0.0628 354.73);
+          --ds-pink-200: oklch(26.2% 0.0859 356.68);
+          --ds-pink-300: oklch(31.15% 0.1067 355.93);
+          --ds-pink-400: oklch(32.13% 0.1174 356.71);
+          --ds-pink-500: oklch(37.01% 0.1453 358.39);
+          --ds-pink-600: oklch(50.33% 0.2089 4.33);
+          --ds-pink-700: oklch(63.52% 0.2346 1.01);
+          --ds-pink-800: oklch(59.51% 0.2429 4.21);
+          --ds-pink-900: oklch(69.36% 0.2223 3.91);
+          --ds-pink-1000: oklch(95.74% 0.0326 350.08);
+
+          --ds-focus-color: oklch(71.7% 0.1648 250.794);
+          --ds-focus-ring:
+            0 0 0 2px hsla(0, 0%, 4%, 1), 0 0 0 4px oklch(71.7% 0.1648 250.794);
+          --ds-focus-ring-outline: 2px solid oklch(71.7% 0.1648 250.794);
+
+          --ds-shadow-border: 0 0 0 1px #ffffff25;
+          --ds-shadow-border-inset: inset 0 0 0 1px #ffffff1a;
+          --ds-shadow-small: 0px 1px 2px #00000029;
+          --ds-shadow-medium: 0px 2px 2px #00000052, 0px 8px 8px -8px #00000029;
+          --ds-shadow-large: 0px 2px 2px #0000000a, 0px 8px 16px -4px #0000000a;
+          --ds-shadow-tooltip:
+            0 0 0 1px #ffffff25, 0px 1px 1px #00000005, 0px 4px 8px #0000000a;
+          --ds-shadow-menu:
+            0 0 0 1px #ffffff25, 0px 1px 1px #00000005,
+            0px 4px 8px -4px #0000000a, 0px 16px 24px -8px #0000000f;
+          --ds-shadow-modal:
+            0 0 0 1px #ffffff25, 0px 1px 1px #00000005,
+            0px 8px 16px -4px #0000000a, 0px 24px 32px -8px #0000000f;
+        }
+      }
+
+      :root[data-theme="dark"] {
+        --ds-background-100: hsla(0, 0%, 4%, 1);
+        --ds-background-200: hsla(0, 0%, 0%, 1);
+
+        --ds-gray-100: hsla(0, 0%, 10%, 1);
+        --ds-gray-200: hsla(0, 0%, 12%, 1);
+        --ds-gray-300: hsla(0, 0%, 16%, 1);
+        --ds-gray-400: hsla(0, 0%, 18%, 1);
+        --ds-gray-500: hsla(0, 0%, 27%, 1);
+        --ds-gray-600: hsla(0, 0%, 53%, 1);
+        --ds-gray-700: hsla(0, 0%, 56%, 1);
+        --ds-gray-800: hsla(0, 0%, 49%, 1);
+        --ds-gray-900: hsla(0, 0%, 63%, 1);
+        --ds-gray-1000: hsla(0, 0%, 93%, 1);
+
+        --ds-gray-alpha-100: #ffffff0f;
+        --ds-gray-alpha-200: #ffffff17;
+        --ds-gray-alpha-300: #ffffff21;
+        --ds-gray-alpha-400: #ffffff24;
+        --ds-gray-alpha-500: #ffffff3d;
+        --ds-gray-alpha-600: #ffffff82;
+        --ds-gray-alpha-700: #ffffff8a;
+        --ds-gray-alpha-800: #ffffff78;
+        --ds-gray-alpha-900: #ffffff9c;
+        --ds-gray-alpha-1000: #ffffffeb;
+
+        --ds-blue-100: oklch(22.17% 0.069 259.89);
+        --ds-blue-200: oklch(25.45% 0.0811 255.8);
+        --ds-blue-300: oklch(30.86% 0.1022 255.21);
+        --ds-blue-400: oklch(34.1% 0.121 254.74);
+        --ds-blue-500: oklch(38.5% 0.1403 254.4);
+        --ds-blue-600: oklch(64.94% 0.1982 251.813);
+        --ds-blue-700: oklch(57.61% 0.2321 258.23);
+        --ds-blue-800: oklch(51.51% 0.2307 257.85);
+        --ds-blue-900: oklch(71.7% 0.1648 250.794);
+        --ds-blue-1000: oklch(96.75% 0.0179 242.423);
+
+        --ds-red-100: oklch(22.1% 0.0657 15.11);
+        --ds-red-200: oklch(25.93% 0.0834 19.02);
+        --ds-red-300: oklch(31.47% 0.1105 20.96);
+        --ds-red-400: oklch(35.27% 0.1273 21.23);
+        --ds-red-500: oklch(40.68% 0.1479 23.16);
+        --ds-red-600: oklch(62.56% 0.2277 23.03);
+        --ds-red-700: oklch(62.56% 0.2234 23.03);
+        --ds-red-800: oklch(58.01% 0.227 25.12);
+        --ds-red-900: oklch(69.96% 0.2136 22.03);
+        --ds-red-1000: oklch(95.6% 0.0293 6.61);
+
+        --ds-amber-100: oklch(22.46% 0.0538 76.04);
+        --ds-amber-200: oklch(24.95% 0.0642 64.78);
+        --ds-amber-300: oklch(32.34% 0.0837 63.83);
+        --ds-amber-400: oklch(35.53% 0.0903 66.2971);
+        --ds-amber-500: oklch(41.55% 0.1044 67.98);
+        --ds-amber-600: oklch(75.04% 0.1737 74.49);
+        --ds-amber-700: oklch(81.87% 0.1969 76.46);
+        --ds-amber-800: oklch(77.21% 0.1991 64.28);
+        --ds-amber-900: oklch(77.21% 0.1991 64.28);
+        --ds-amber-1000: oklch(96.7% 0.0418 84.59);
+
+        --ds-green-100: oklch(23.09% 0.0716 149.68);
+        --ds-green-200: oklch(27.12% 0.0895 150.09);
+        --ds-green-300: oklch(29.84% 0.096 149.25);
+        --ds-green-400: oklch(34.39% 0.1039 147.78);
+        --ds-green-500: oklch(44.19% 0.1484 147.2);
+        --ds-green-600: oklch(58.11% 0.1815 146.55);
+        --ds-green-700: oklch(64.58% 0.199 147.27);
+        --ds-green-800: oklch(57.81% 0.1776 147.5);
+        --ds-green-900: oklch(73.1% 0.2158 148.29);
+        --ds-green-1000: oklch(96.76% 0.056 154.18);
+
+        --ds-teal-100: oklch(22.1% 0.0544 178.74);
+        --ds-teal-200: oklch(25.06% 0.062 178.76);
+        --ds-teal-300: oklch(31.5% 0.0767 180.99);
+        --ds-teal-400: oklch(32.43% 0.0763 180.13);
+        --ds-teal-500: oklch(43.35% 0.1055 180.97);
+        --ds-teal-600: oklch(60.71% 0.1485 180.24);
+        --ds-teal-700: oklch(64.92% 0.1403 181.95);
+        --ds-teal-800: oklch(57.53% 0.1392 181.66);
+        --ds-teal-900: oklch(74.56% 0.1765 182.8);
+        --ds-teal-1000: oklch(96.46% 0.056 180.29);
+
+        --ds-purple-100: oklch(22.34% 0.0779 316.87);
+        --ds-purple-200: oklch(25.91% 0.0921 314.41);
+        --ds-purple-300: oklch(31.98% 0.1219 312.41);
+        --ds-purple-400: oklch(35.93% 0.1504 309.78);
+        --ds-purple-500: oklch(40.99% 0.1721 307.92);
+        --ds-purple-600: oklch(55.5% 0.2191 306.12);
+        --ds-purple-700: oklch(55.5% 0.2186 306.12);
+        --ds-purple-800: oklch(48.58% 0.2102 305.73);
+        --ds-purple-900: oklch(69.87% 0.2037 309.51);
+        --ds-purple-1000: oklch(96.1% 0.0304 316.46);
+
+        --ds-pink-100: oklch(22.67% 0.0628 354.73);
+        --ds-pink-200: oklch(26.2% 0.0859 356.68);
+        --ds-pink-300: oklch(31.15% 0.1067 355.93);
+        --ds-pink-400: oklch(32.13% 0.1174 356.71);
+        --ds-pink-500: oklch(37.01% 0.1453 358.39);
+        --ds-pink-600: oklch(50.33% 0.2089 4.33);
+        --ds-pink-700: oklch(63.52% 0.2346 1.01);
+        --ds-pink-800: oklch(59.51% 0.2429 4.21);
+        --ds-pink-900: oklch(69.36% 0.2223 3.91);
+        --ds-pink-1000: oklch(95.74% 0.0326 350.08);
+
+        --ds-focus-color: oklch(71.7% 0.1648 250.794);
+        --ds-focus-ring:
+          0 0 0 2px hsla(0, 0%, 4%, 1), 0 0 0 4px oklch(71.7% 0.1648 250.794);
+        --ds-focus-ring-outline: 2px solid oklch(71.7% 0.1648 250.794);
+
+        --ds-shadow-border: 0 0 0 1px #ffffff25;
+        --ds-shadow-border-inset: inset 0 0 0 1px #ffffff1a;
+        --ds-shadow-small: 0px 1px 2px #00000029;
+        --ds-shadow-medium: 0px 2px 2px #00000052, 0px 8px 8px -8px #00000029;
+        --ds-shadow-large: 0px 2px 2px #0000000a, 0px 8px 16px -4px #0000000a;
+        --ds-shadow-tooltip:
+          0 0 0 1px #ffffff25, 0px 1px 1px #00000005, 0px 4px 8px #0000000a;
+        --ds-shadow-menu:
+          0 0 0 1px #ffffff25, 0px 1px 1px #00000005,
+          0px 4px 8px -4px #0000000a, 0px 16px 24px -8px #0000000f;
+        --ds-shadow-modal:
+          0 0 0 1px #ffffff25, 0px 1px 1px #00000005,
+          0px 8px 16px -4px #0000000a, 0px 24px 32px -8px #0000000f;
+      }
+    </style>
+    <style>
+      /* Geist type scale. Class names and values match vercel.com/geist/typography
+ * (computed from the live page). Pair with geist-tokens.css.
+ *
+ * Four families:
+ *   heading  - display and section titles. 600 weight, negative tracking.
+ *   copy     - body prose. 400 weight, generous line-height.
+ *   label    - UI text, table cells, captions. 400 weight, tight line-height.
+ *   button   - interactive control text. 500 weight.
+ * The number is the font-size in px.
+ */
+
+      :root {
+        font-family: var(--ds-font-sans);
+      }
+
+      code,
+      pre,
+      kbd,
+      samp,
+      .font-mono {
+        font-family: var(--ds-font-mono);
+      }
+
+      /* Headings */
+      .text-heading-72 {
+        font-size: 72px;
+        line-height: 72px;
+        letter-spacing: -4.32px;
+        font-weight: 600;
+      }
+      .text-heading-64 {
+        font-size: 64px;
+        line-height: 64px;
+        letter-spacing: -3.84px;
+        font-weight: 600;
+      }
+      .text-heading-56 {
+        font-size: 56px;
+        line-height: 56px;
+        letter-spacing: -3.36px;
+        font-weight: 600;
+      }
+      .text-heading-48 {
+        font-size: 48px;
+        line-height: 56px;
+        letter-spacing: -2.88px;
+        font-weight: 600;
+      }
+      .text-heading-40 {
+        font-size: 40px;
+        line-height: 48px;
+        letter-spacing: -2.4px;
+        font-weight: 600;
+      }
+      .text-heading-32 {
+        font-size: 32px;
+        line-height: 40px;
+        letter-spacing: -1.28px;
+        font-weight: 600;
+      }
+      .text-heading-24 {
+        font-size: 24px;
+        line-height: 32px;
+        letter-spacing: -0.96px;
+        font-weight: 600;
+      }
+      .text-heading-20 {
+        font-size: 20px;
+        line-height: 26px;
+        letter-spacing: -0.4px;
+        font-weight: 600;
+      }
+      .text-heading-16 {
+        font-size: 16px;
+        line-height: 24px;
+        letter-spacing: -0.32px;
+        font-weight: 600;
+      }
+      .text-heading-14 {
+        font-size: 14px;
+        line-height: 20px;
+        letter-spacing: -0.28px;
+        font-weight: 600;
+      }
+
+      /* Body copy */
+      .text-copy-24 {
+        font-size: 24px;
+        line-height: 36px;
+        font-weight: 400;
+      }
+      .text-copy-20 {
+        font-size: 20px;
+        line-height: 36px;
+        font-weight: 400;
+      }
+      .text-copy-18 {
+        font-size: 18px;
+        line-height: 28px;
+        font-weight: 400;
+      }
+      .text-copy-16 {
+        font-size: 16px;
+        line-height: 24px;
+        font-weight: 400;
+      }
+      .text-copy-14 {
+        font-size: 14px;
+        line-height: 20px;
+        font-weight: 400;
+      }
+      .text-copy-13 {
+        font-size: 13px;
+        line-height: 18px;
+        font-weight: 400;
+      }
+
+      /* UI labels */
+      .text-label-20 {
+        font-size: 20px;
+        line-height: 32px;
+        font-weight: 400;
+      }
+      .text-label-18 {
+        font-size: 18px;
+        line-height: 20px;
+        font-weight: 400;
+      }
+      .text-label-16 {
+        font-size: 16px;
+        line-height: 20px;
+        font-weight: 400;
+      }
+      .text-label-14 {
+        font-size: 14px;
+        line-height: 20px;
+        font-weight: 400;
+      }
+      .text-label-13 {
+        font-size: 13px;
+        line-height: 16px;
+        font-weight: 400;
+      }
+      .text-label-12 {
+        font-size: 12px;
+        line-height: 16px;
+        font-weight: 400;
+      }
+
+      .text-label-14-mono {
+        font-size: 14px;
+        line-height: 20px;
+        font-weight: 400;
+        font-family: var(--ds-font-mono);
+      }
+      .text-label-13-mono {
+        font-size: 13px;
+        line-height: 16px;
+        font-weight: 400;
+        font-family: var(--ds-font-mono);
+      }
+      .text-label-12-mono {
+        font-size: 12px;
+        line-height: 16px;
+        font-weight: 400;
+        font-family: var(--ds-font-mono);
+      }
+
+      /* Controls */
+      .text-button-16 {
+        font-size: 16px;
+        line-height: 20px;
+        font-weight: 500;
+      }
+      .text-button-14 {
+        font-size: 14px;
+        line-height: 20px;
+        font-weight: 500;
+      }
+      .text-button-12 {
+        font-size: 12px;
+        line-height: 16px;
+        font-weight: 500;
+      }
+
+      /* "Strong" variants bump weight without changing metrics. */
+      .text-copy-24-strong,
+      .text-copy-20-strong,
+      .text-copy-18-strong,
+      .text-copy-16-strong,
+      .text-copy-14-strong,
+      .text-label-16-strong,
+      .text-label-14-strong {
+        font-weight: 500;
+      }
+    </style>
+    <style>
+      :root {
+        --rail-x: 11px;
+        --gutter: 48px;
+        --node-size: 14px;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--ds-background-200);
+        color: var(--ds-gray-1000);
+        font-family: var(--ds-font-sans), system-ui, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      h1,
+      h2,
+      p,
+      pre,
+      ul {
+        margin: 0;
+      }
+      .mono {
+        font-family: var(--ds-font-mono), ui-monospace, monospace;
+      }
+      .secondary {
+        color: var(--ds-gray-900);
+      }
+
+      .toolbar {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: color-mix(
+          in srgb,
+          var(--ds-background-200) 85%,
+          transparent
+        );
+        backdrop-filter: blur(8px);
+        border-bottom: 1px solid var(--ds-gray-alpha-400);
+      }
+      .toolbar-inner {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 10px 24px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+      .progress-text {
+        flex: 1;
+        font-size: 13px;
+        color: var(--ds-gray-900);
+      }
+      .prototype-tag {
+        font-size: 12px;
+        color: var(--ds-amber-900);
+      }
+
+      button {
+        font: inherit;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        white-space: nowrap;
+        height: 32px;
+        padding: 0 12px;
+        border-radius: var(--ds-radius-base);
+        border: none;
+        background: transparent;
+        color: var(--ds-gray-1000);
+      }
+      button:hover {
+        background: var(--ds-gray-alpha-200);
+      }
+      button:focus-visible {
+        outline: var(--ds-focus-ring-outline);
+        outline-offset: 1px;
+      }
+      .button-solid {
+        background: var(--ds-gray-1000);
+        color: var(--ds-background-100);
+      }
+      .button-solid:hover {
+        background: var(--ds-gray-900);
+      }
+      .icon-button {
+        width: 32px;
+        padding: 0;
+        color: var(--ds-gray-900);
+      }
+
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 56px 24px 96px;
+      }
+      .page-title {
+        margin-bottom: 8px;
+      }
+      .page-summary {
+        margin-bottom: 48px;
+        max-width: 60ch;
+      }
+
+      .graph {
+        position: relative;
+        list-style: none;
+        padding: 0;
+      }
+      .graph::before {
+        content: "";
+        position: absolute;
+        left: var(--rail-x);
+        top: 8px;
+        bottom: 8px;
+        width: 2px;
+        background: var(--ds-gray-400);
+      }
+      .graph-entry {
+        position: relative;
+        padding-left: var(--gutter);
+        padding-bottom: 40px;
+      }
+      .graph-entry:last-child {
+        padding-bottom: 0;
+      }
+      .node {
+        position: absolute;
+        left: calc(var(--rail-x) + 1px - var(--node-size) / 2);
+        top: 4px;
+        width: var(--node-size);
+        height: var(--node-size);
+        border-radius: 50%;
+        background: var(--ds-background-200);
+        border: 2px solid var(--node-color, var(--ds-gray-600));
+        transition:
+          background 0.2s,
+          transform 0.2s;
+      }
+      .graph-entry.copied .node {
+        background: var(--node-color, var(--ds-gray-600));
+        transform: scale(1.15);
+      }
+      .node-base {
+        border-radius: 3px;
+        background: var(--ds-gray-600);
+        border-color: var(--ds-gray-600);
+      }
+      .node-end {
+        --node-color: var(--ds-green-700);
+        border-style: dashed;
+      }
+      .graph.complete .node-end {
+        border-style: solid;
+        background: var(--ds-green-700);
+      }
+
+      .type-feat {
+        --node-color: var(--ds-blue-700);
+      }
+      .type-fix {
+        --node-color: var(--ds-red-700);
+      }
+      .type-refactor {
+        --node-color: var(--ds-purple-700);
+      }
+      .type-docs {
+        --node-color: var(--ds-teal-700);
+      }
+      .type-prep {
+        --node-color: var(--ds-amber-700);
+      }
+      .type-word {
+        color: var(--node-color, var(--ds-gray-900));
+        font-weight: 600;
+      }
+
+      .entry-meta {
+        font-size: 13px;
+        color: var(--ds-gray-900);
+        margin-bottom: 6px;
+        display: flex;
+        gap: 12px;
+      }
+      .entry-header {
+        font-family: var(--ds-font-mono), ui-monospace, monospace;
+        font-size: 15px;
+        line-height: 22px;
+        font-weight: 500;
+      }
+      .entry-body {
+        font-family: var(--ds-font-mono), ui-monospace, monospace;
+        font-size: 13px;
+        line-height: 20px;
+        color: var(--ds-gray-1000);
+        white-space: pre-wrap;
+        margin-top: 8px;
+        max-width: 72ch;
+      }
+      .entry-reason {
+        color: var(--ds-gray-900);
+        font-size: 14px;
+        line-height: 22px;
+        margin-top: 12px;
+        max-width: 60ch;
+      }
+      .file-list {
+        list-style: none;
+        padding: 0;
+        margin-top: 12px;
+        font-family: var(--ds-font-mono), ui-monospace, monospace;
+        font-size: 12px;
+        line-height: 20px;
+        color: var(--ds-gray-900);
+      }
+      .file-list li {
+        display: grid;
+        grid-template-columns: 16px 1fr auto;
+        gap: 8px;
+      }
+      .rule-reason {
+        font-family: var(--ds-font-sans), system-ui, sans-serif;
+        font-size: 13px;
+      }
+      .list-caption {
+        margin-top: 12px;
+        font-size: 13px;
+        color: var(--ds-gray-900);
+      }
+      .list-caption + .file-list {
+        margin-top: 4px;
+      }
+      .file-path {
+        color: var(--ds-gray-1000);
+      }
+      .partial-note {
+        color: var(--ds-amber-900);
+      }
+      .count-added {
+        color: var(--ds-green-900);
+      }
+      .count-deleted {
+        color: var(--ds-red-900);
+        margin-left: 6px;
+      }
+
+      .command-block {
+        position: relative;
+        margin-top: 16px;
+        border-radius: var(--ds-radius-base);
+        background: var(--ds-background-100);
+        box-shadow: var(--ds-shadow-border);
+      }
+      .command-block pre {
+        padding: 14px 96px 14px 16px;
+        overflow-x: auto;
+        font-family: var(--ds-font-mono), ui-monospace, monospace;
+        font-size: 13px;
+        line-height: 21px;
+      }
+      .command-block .copy-button {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        height: 28px;
+        color: var(--ds-gray-900);
+      }
+      .copy-button.just-copied {
+        color: var(--ds-green-900);
+      }
+      .command-prompt {
+        color: var(--ds-gray-700);
+        user-select: none;
+      }
+
+      .disclosure {
+        margin-top: 8px;
+        font-size: 13px;
+      }
+      .disclosure summary {
+        cursor: pointer;
+        color: var(--ds-gray-900);
+        width: fit-content;
+      }
+      .disclosure summary:hover {
+        color: var(--ds-gray-1000);
+      }
+      .disclosure .command-block {
+        margin-top: 8px;
+      }
+
+      .left-out {
+        margin-top: 56px;
+        padding-top: 24px;
+        border-top: 1px solid var(--ds-gray-alpha-400);
+        font-size: 14px;
+        line-height: 22px;
+      }
+      .left-out h2 {
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+      .left-out ul {
+        padding-left: 18px;
+      }
+
+      @media (max-width: 560px) {
+        :root {
+          --gutter: 36px;
+        }
+        main {
+          padding-top: 32px;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .node {
+          transition: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="toolbar">
+      <div class="toolbar-inner">
+        <span class="progress-text" id="progress-text"></span>
+        <span class="prototype-tag">Prototype</span>
+        <button
+          class="icon-button"
+          id="toggle-theme"
+          aria-label="Switch light or dark theme"
+        >
+          ◐
+        </button>
+        <button class="button-solid" id="copy-all">Copy all commands</button>
+      </div>
+    </div>
+    <main>
+      <h1 class="text-heading-32 page-title" id="page-title"></h1>
+      <p class="text-copy-16 secondary page-summary" id="page-summary"></p>
+      <ol class="graph" id="graph"></ol>
+      <section class="left-out" id="left-out"></section>
+    </main>
+    <script>
+      const PLAN_DIRECTORY = "/Users/jorden/src/skills/.git/commit-plan";
+
+      const samplePlan = {
+        repository: "skills",
+        branch: "main",
+        base: "b9b4bfe",
+        baseSubject: "feat: port install and refresh to a Go skills binary",
+        indexHadStagedChanges: true,
+        gitignoreEndsWithNewline: true,
+        ignore: {
+          subject: "ignore local env files, browser tool output and .DS_Store",
+          rules: [
+            {
+              pattern: ".env.local",
+              reason: "local secrets",
+              hides: [".env.local"],
+            },
+            {
+              pattern: ".playwright-mcp/",
+              reason: "browser tool output",
+              hides: [".playwright-mcp/ (3 files)"],
+            },
+            {
+              pattern: ".DS_Store",
+              reason: "macOS folder metadata",
+              hides: [".DS_Store"],
+            },
+          ],
+          untrack: [".DS_Store"],
+        },
+        commits: [
+          {
+            type: "refactor",
+            scope: "preview",
+            subject: "extract Geist CSS inlining into a function",
+            body: "The commit renderer needs the same inlining. Moving it out of\nmain() lets both scripts share one implementation.",
+            footers: [],
+            rationale:
+              "A move with no change in behaviour, placed first so the next commit can build on it.",
+            files: [
+              {
+                path: "skills/pr-draft/preview",
+                status: "M",
+                added: 18,
+                deleted: 11,
+              },
+            ],
+            patch: null,
+          },
+          {
+            type: "feat",
+            scope: "commit",
+            subject: "add commit plan renderer",
+            body: "render validates plan.json, replays it in a temporary index and\nwrites an HTML page with copyable commands. It never touches the\nreal index.",
+            footers: ["Refs: plans/009-add-commit-skill.md"],
+            rationale:
+              "The renderer, its page template and its tests belong together.",
+            files: [
+              {
+                path: "skills/commit/render",
+                status: "A",
+                added: 212,
+                deleted: 0,
+              },
+              {
+                path: "skills/commit/assets/page.html",
+                status: "A",
+                added: 164,
+                deleted: 0,
+              },
+              {
+                path: "test/commit/test_render.py",
+                status: "A",
+                added: 188,
+                deleted: 0,
+              },
+              { path: "package.json", status: "M", added: 1, deleted: 0 },
+            ],
+            patch: null,
+          },
+          {
+            type: "feat",
+            scope: "commit",
+            subject: "add /commit skill instructions",
+            body: "Teaches the agent to group changes, follow the repo's commitlint\nrules, and hand the plan to render.",
+            footers: [],
+            rationale:
+              "The skill and the README line that lists it. Only that one hunk of README.md goes here.",
+            files: [
+              {
+                path: "skills/commit/SKILL.md",
+                status: "A",
+                added: 96,
+                deleted: 0,
+              },
+              {
+                path: "README.md",
+                status: "M",
+                added: 1,
+                deleted: 0,
+                partial: true,
+              },
+            ],
+            patch: "patch-03.diff",
+          },
+          {
+            type: "docs",
+            scope: null,
+            subject: "define Commit Plan in the glossary",
+            body: "",
+            footers: [],
+            rationale:
+              "Documentation only: the glossary entry and the rest of README.md.",
+            files: [
+              { path: "CONTEXT.md", status: "M", added: 9, deleted: 0 },
+              {
+                path: "README.md",
+                status: "M",
+                added: 4,
+                deleted: 2,
+                partial: true,
+              },
+              { path: "plans/README.md", status: "M", added: 1, deleted: 0 },
+            ],
+            patch: null,
+          },
+        ],
+        excluded: [],
+      };
+
+      const copiedEntries = new Set();
+
+      function escapeHtml(text) {
+        return String(text).replace(
+          /[&<>"']/g,
+          (character) =>
+            ({
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              '"': "&quot;",
+              "'": "&#39;",
+            })[character]
+        );
+      }
+
+      function commitHeader(commit) {
+        const scopePart = commit.scope ? `(${commit.scope})` : "";
+        return `${commit.type}${scopePart}: ${commit.subject}`;
+      }
+
+      function messageTail(commit) {
+        return [commit.body, commit.footers.join("\n")]
+          .filter(Boolean)
+          .join("\n\n");
+      }
+
+      function fullMessage(commit) {
+        return [commitHeader(commit), messageTail(commit)]
+          .filter(Boolean)
+          .join("\n\n");
+      }
+
+      function messagePath(position) {
+        return `${PLAN_DIRECTORY}/msg-${String(position).padStart(2, "0")}.txt`;
+      }
+
+      function continuedCommand(prefix, items, suffix = "") {
+        const ending = suffix ? ` ${suffix}` : "";
+        if (items.length === 1) return `${prefix} ${items[0]}${ending}`;
+        return [
+          `${prefix} \\`,
+          ...items.map(
+            (item, index) =>
+              `  ${item}${index < items.length - 1 ? " \\" : ending}`
+          ),
+        ].join("\n");
+      }
+
+      function addCommand(paths) {
+        return continuedCommand("git add -A --", paths);
+      }
+
+      function quoteForShell(text) {
+        return `'${text}'`;
+      }
+
+      function ignoreCommands(plan, position) {
+        const quotedPatterns = plan.ignore.rules.map((rule) =>
+          quoteForShell(rule.pattern)
+        );
+        if (!plan.gitignoreEndsWithNewline) quotedPatterns.unshift("''");
+        const lines = [
+          continuedCommand("printf '%s\\n'", quotedPatterns, ">> .gitignore"),
+        ];
+        if (plan.ignore.untrack.length)
+          lines.push(
+            continuedCommand(
+              "git rm -r --cached --quiet --",
+              plan.ignore.untrack
+            )
+          );
+        lines.push("git add .gitignore");
+        lines.push(`git commit -F ${messagePath(position)}`);
+        return lines.join("\n");
+      }
+
+      function ignoreCommit(plan) {
+        return {
+          type: "chore",
+          scope: null,
+          subject: plan.ignore.subject,
+          body: "",
+          footers: [],
+          rationale:
+            "Goes first so no later commit picks these files up, and they never appear in the history.",
+          files: [
+            {
+              path: ".gitignore",
+              status: "M",
+              added: plan.ignore.rules.length,
+              deleted: 0,
+            },
+          ],
+          ignoreRules: plan.ignore.rules,
+          untrack: plan.ignore.untrack,
+        };
+      }
+
+      function plannedCommits(plan) {
+        return plan.ignore
+          ? [ignoreCommit(plan), ...plan.commits]
+          : plan.commits;
+      }
+
+      function commitCommands(commit, position) {
+        const wholeFilePaths = commit.files
+          .filter((file) => !file.partial)
+          .map((file) => file.path);
+        const lines = [];
+        if (wholeFilePaths.length) lines.push(addCommand(wholeFilePaths));
+        if (commit.patch)
+          lines.push(`git apply --cached ${PLAN_DIRECTORY}/${commit.patch}`);
+        lines.push(`git commit -F ${messagePath(position)}`);
+        return lines.join("\n");
+      }
+
+      const unstageCommand = "git reset -q";
+
+      function planEntries(plan) {
+        const entries = plannedCommits(plan).map((commit, index) => ({
+          kind: "commit",
+          commit,
+          position: index + 1,
+          commands: commit.ignoreRules
+            ? ignoreCommands(plan, index + 1)
+            : commitCommands(commit, index + 1),
+        }));
+        if (plan.indexHadStagedChanges)
+          entries.unshift({ kind: "prep", commands: unstageCommand });
+        return entries;
+      }
+
+      function allCommands(plan) {
+        return planEntries(plan)
+          .map((entry) => entry.commands)
+          .join("\n");
+      }
+
+      function highlightCommands(commands) {
+        return commands
+          .split("\n")
+          .map((line) =>
+            !line.startsWith(" ")
+              ? `<span class="command-prompt">$ </span>${escapeHtml(line)}`
+              : `  ${escapeHtml(line)}`
+          )
+          .join("\n");
+      }
+
+      function commandBlock(commands, entryKey) {
+        return `<div class="command-block">
+          <pre>${highlightCommands(commands)}</pre>
+          <button class="copy-button" data-copy="${escapeHtml(commands)}" data-entry="${entryKey}">Copy</button>
+        </div>`;
+      }
+
+      function fileList(files) {
+        const rows = files
+          .map(
+            (file) => `<li>
+              <span>${file.status}</span>
+              <span><span class="file-path">${escapeHtml(file.path)}</span>${file.partial ? ' <span class="partial-note">some changes only</span>' : ""}</span>
+              <span><span class="count-added">+${file.added}</span>${file.deleted ? `<span class="count-deleted">−${file.deleted}</span>` : ""}</span>
+            </li>`
+          )
+          .join("");
+        return `<ul class="file-list">${rows}</ul>`;
+      }
+
+      function baseEntry(plan) {
+        return `<li class="graph-entry">
+          <span class="node node-base" aria-hidden="true"></span>
+          <p class="entry-meta"><span>Current commit</span><span class="mono">${plan.base}</span></p>
+          <p class="entry-header secondary">${escapeHtml(plan.baseSubject)}</p>
+        </li>`;
+      }
+
+      function prepEntry(entry, entryKey) {
+        return `<li class="graph-entry type-prep ${copiedEntries.has(entryKey) ? "copied" : ""}" data-entry="${entryKey}">
+          <span class="node" aria-hidden="true"></span>
+          <p class="entry-meta"><span>Before you start</span></p>
+          <p class="entry-header">Unstage what's already staged</p>
+          <p class="entry-reason secondary">Some changes were already staged. This clears the staging area so each commit takes exactly the files listed. Your files on disk don't change.</p>
+          ${commandBlock(entry.commands, entryKey)}
+        </li>`;
+      }
+
+      function commitEntry(entry, entryKey) {
+        const { commit, position } = entry;
+        const tail = messageTail(commit);
+        return `<li class="graph-entry type-${commit.type} ${copiedEntries.has(entryKey) ? "copied" : ""}" data-entry="${entryKey}">
+          <span class="node" aria-hidden="true"></span>
+          <p class="entry-meta"><span>Commit ${position} of ${plannedCommits(samplePlan).length}</span></p>
+          <h2 class="entry-header"><span class="type-word">${commit.type}</span>${escapeHtml(commitHeader(commit).slice(commit.type.length))}</h2>
+          ${tail ? `<p class="entry-body">${escapeHtml(tail)}</p>` : ""}
+          <p class="entry-reason">${escapeHtml(commit.rationale)}</p>
+          ${commit.ignoreRules ? ignoreRuleList(commit) : fileList(commit.files)}
+          ${commandBlock(entry.commands, entryKey)}
+          <details class="disclosure">
+            <summary>Message only, for a Git app</summary>
+            ${commandBlockForMessage(commit)}
+          </details>
+        </li>`;
+      }
+
+      function hiddenFilesNote(rule) {
+        const onlyHidesItself =
+          rule.hides.length === 1 && rule.hides[0] === rule.pattern;
+        return onlyHidesItself
+          ? ""
+          : `, hides ${rule.hides.map(escapeHtml).join(", ")}`;
+      }
+
+      function ignoreRuleList(commit) {
+        const rows = commit.ignoreRules
+          .map(
+            (rule) => `<li>
+              <span>+</span>
+              <span><span class="file-path">${escapeHtml(rule.pattern)}</span> <span class="rule-reason">${escapeHtml(rule.reason)}${hiddenFilesNote(rule)}</span>${commit.untrack.includes(rule.pattern) ? ' <span class="partial-note rule-reason">kept on disk, removed from Git</span>' : ""}</span>
+              <span></span>
+            </li>`
+          )
+          .join("");
+        return `<p class="list-caption">Added to .gitignore</p><ul class="file-list">${rows}</ul>`;
+      }
+
+      function commandBlockForMessage(commit) {
+        const message = fullMessage(commit);
+        return `<div class="command-block">
+          <pre>${escapeHtml(message)}</pre>
+          <button class="copy-button" data-copy="${escapeHtml(message)}">Copy</button>
+        </div>`;
+      }
+
+      function endEntry() {
+        return `<li class="graph-entry">
+          <span class="node node-end" aria-hidden="true"></span>
+          <p class="entry-header">Working tree clean</p>
+          <p class="entry-reason secondary">After the last commit, <span class="mono">git status</span> shows nothing to commit.</p>
+        </li>`;
+      }
+
+      function renderGraph(plan) {
+        const entries = planEntries(plan);
+        const entryMarkup = entries
+          .map((entry, index) =>
+            entry.kind === "prep"
+              ? prepEntry(entry, index)
+              : commitEntry(entry, index)
+          )
+          .join("");
+        const graph = document.getElementById("graph");
+        graph.innerHTML = baseEntry(plan) + entryMarkup + endEntry();
+        graph.classList.toggle(
+          "complete",
+          copiedEntries.size === entries.length
+        );
+      }
+
+      function renderHeader(plan) {
+        const count = plannedCommits(plan).length;
+        document.getElementById("page-title").textContent =
+          `${count} commits for ${plan.repository}`;
+        document.getElementById("page-summary").textContent =
+          `Run these in order on ${plan.branch}. Nothing has been staged or committed yet; this page only shows the commands.`;
+      }
+
+      function renderProgress(plan) {
+        const total = planEntries(plan).length;
+        const copiedCount = copiedEntries.size;
+        document.getElementById("progress-text").textContent =
+          copiedCount === 0
+            ? `${total} steps to run`
+            : `${copiedCount} of ${total} steps copied`;
+      }
+
+      function renderLeftOut(plan) {
+        const leftOut = document.getElementById("left-out");
+        leftOut.hidden = plan.excluded.length === 0;
+        const items = plan.excluded
+          .map(
+            (item) =>
+              `<li><span class="mono">${escapeHtml(item.path)}</span> ${escapeHtml(item.reason)}</li>`
+          )
+          .join("");
+        leftOut.innerHTML = `<h2>Left out</h2><ul>${items}</ul>`;
+      }
+
+      function renderPage(plan) {
+        renderHeader(plan);
+        renderGraph(plan);
+        renderProgress(plan);
+        renderLeftOut(plan);
+      }
+
+      async function copyText(text) {
+        try {
+          await navigator.clipboard.writeText(text);
+        } catch {
+          const scratch = document.createElement("textarea");
+          scratch.value = text;
+          document.body.append(scratch);
+          scratch.select();
+          document.execCommand("copy");
+          scratch.remove();
+        }
+      }
+
+      function confirmCopy(button) {
+        const label = button.textContent;
+        button.textContent = "Copied";
+        button.classList.add("just-copied");
+        setTimeout(() => {
+          button.textContent = label;
+          button.classList.remove("just-copied");
+        }, 1400);
+      }
+
+      function markEntryCopied(entryKey) {
+        copiedEntries.add(Number(entryKey));
+        document
+          .querySelector(`.graph-entry[data-entry="${entryKey}"]`)
+          .classList.add("copied");
+        document
+          .getElementById("graph")
+          .classList.toggle(
+            "complete",
+            copiedEntries.size === planEntries(samplePlan).length
+          );
+        renderProgress(samplePlan);
+      }
+
+      document.addEventListener("click", async (event) => {
+        const button = event.target.closest(".copy-button");
+        if (!button) return;
+        await copyText(button.dataset.copy);
+        confirmCopy(button);
+        if (button.dataset.entry !== undefined)
+          markEntryCopied(button.dataset.entry);
+      });
+
+      document
+        .getElementById("copy-all")
+        .addEventListener("click", async (event) => {
+          await copyText(allCommands(samplePlan));
+          confirmCopy(event.currentTarget);
+          planEntries(samplePlan).forEach((entry, index) =>
+            markEntryCopied(index)
+          );
+        });
+
+      document.getElementById("toggle-theme").addEventListener("click", () => {
+        const root = document.documentElement;
+        const prefersDark = matchMedia("(prefers-color-scheme: dark)").matches;
+        const isDark = root.dataset.theme
+          ? root.dataset.theme === "dark"
+          : prefersDark;
+        root.dataset.theme = isDark ? "light" : "dark";
+      });
+
+      renderPage(samplePlan);
+    </script>
+  </body>
+</html>
