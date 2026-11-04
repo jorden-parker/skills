@@ -118,7 +118,7 @@ Run the bundled `preview` command with the body file and title. Resolve the exec
 <skill-directory>/preview "$DRAFT_DIR/body.md" --title "<title>" --output "$DRAFT_DIR/preview.html" --replace
 ```
 
-Use this same output path on every invocation. `--replace` updates the existing preview; without it, the command preserves existing files. It requires Python 3 and a one-time `pnpm install` in this skills repository to install the renderer. It prints the generated file's absolute path and opens it in the default browser. If opening fails, report that and provide the path.
+Use this same output path on every invocation. `--replace` updates the existing preview; without it, the command preserves existing files. It requires Python 3 and a one-time `pnpm install` in this skills repository to install the renderer. It prints the generated file's absolute path and opens nothing. Run `open <path>` as its own command (no `&&`, no quotes). If opening fails, report that and provide the path.
 
 The preview renders the whole description as HTML in [assets/preview.html](assets/preview.html), with headings, lists, tables, links, and a copy button on each code block. The markers stay in the Markdown and are invisible in the rendered page. Marked renders Markdown and DOMPurify sanitizes the HTML. Both libraries and the sibling [Geist](../geist/SKILL.md) token and type CSS are embedded, so rendering works offline in light and dark themes. Fonts load from Google Fonts with local fallbacks. Read the Geist skill before changing the preview's styling.
 

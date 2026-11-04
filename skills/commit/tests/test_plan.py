@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 PLAN_SCRIPT = Path(__file__).resolve().parents[1] / "plan"
+RENDER_SCRIPT = Path(__file__).resolve().parents[1] / "render"
 
 
 def git(repo, *arguments):
@@ -64,7 +65,7 @@ def test_build_writes_plan_and_page(repo, tmp_path):
             {"header": "feat(cli)!: add thing", "why": "because", "paths": ["a.go", "notes.txt"]}
         ]
     }
-    result = run_plan(repo, tmp_path, "build", "--no-open", stdin=json.dumps(document))
+    result = run_plan(repo, tmp_path, "build", stdin=json.dumps(document))
     assert result.returncode == 0, result.stderr
     page = Path(result.stdout.strip())
     assert page.name == "index.html" and page.exists()
@@ -81,6 +82,17 @@ def test_build_writes_plan_and_page(repo, tmp_path):
 def test_build_rejects_invalid_header(repo, tmp_path):
     dirty(repo)
     document = {"commits": [{"header": "nonsense", "why": "x", "paths": ["a.go"]}]}
-    result = run_plan(repo, tmp_path, "build", "--no-open", stdin=json.dumps(document))
+    result = run_plan(repo, tmp_path, "build", stdin=json.dumps(document))
     assert result.returncode != 0
     assert "header must look like" in result.stderr
+
+
+def test_build_rejects_no_open_flag(repo, tmp_path):
+    dirty(repo)
+    result = run_plan(repo, tmp_path, "build", "--no-open", stdin=json.dumps({"commits": []}))
+    assert result.returncode == 2
+
+
+def test_render_rejects_no_open_flag():
+    result = subprocess.run([sys.executable, str(RENDER_SCRIPT), "--no-open", "plan.json"], capture_output=True, text=True)
+    assert result.returncode == 2

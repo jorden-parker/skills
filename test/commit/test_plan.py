@@ -102,7 +102,7 @@ class PlanTestCase(unittest.TestCase):
         (self.repo / "a.txt").write_text("a\n", encoding="utf-8")
         self.plan("new")
         self.plan("commit", "feat: add a", "--why", "new file", "a.txt")
-        result = self.run_tool(RENDER, "--no-open", str(self.plan_file))
+        result = self.run_tool(RENDER, str(self.plan_file))
         self.assertEqual(result.returncode, 0, result.stderr)
 
 

@@ -1,6 +1,6 @@
 # Artifact
 
-The shared renderer every skill uses to show a result as a page: one Markdown file in, one standalone Geist-styled HTML file out, opened in the browser.
+The shared renderer every skill uses to show a result as a page: one Markdown file in, one standalone Geist-styled HTML file out. It prints the file's path and opens nothing; the agent runs `open <path>` as a separate step.
 
 ```sh
 ./artifact/render findings.md --title "Which Node is LTS?" --eyebrow "Web research"

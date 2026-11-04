@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render a PR description as portable Geist HTML and open it in the browser."""
+"""Render a PR description as portable Geist HTML."""
 
 import argparse
 import html
@@ -7,7 +7,6 @@ from pathlib import Path
 import re
 import subprocess
 import sys
-import webbrowser
 
 
 def repository_template(repo):
@@ -70,15 +69,6 @@ def main():
         parser.exit(1, f"preview: {error}\n")
     path = args.output.resolve()
     print(path)
-    try:
-        if sys.platform == "darwin":
-            opened = subprocess.run(["open", path.as_uri()], check=False).returncode == 0
-        else:
-            opened = webbrowser.open(path.as_uri(), new=2)
-    except (OSError, webbrowser.Error):
-        opened = False
-    if not opened:
-        print(f"preview: browser could not open {path}", file=sys.stderr)
 
 
 if __name__ == "__main__":

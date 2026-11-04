@@ -13,7 +13,6 @@ import shlex
 import subprocess
 import sys
 import tempfile
-import webbrowser
 
 SKILL_DIRECTORY = Path(__file__).resolve().parent
 TEMPLATE_PATH = SKILL_DIRECTORY / "assets" / "page.html"
@@ -565,7 +564,7 @@ def render_page(context, steps, repository, ignored):
     return re.sub(pattern, lambda match: values[match.group()], template)
 
 
-def render_plan(plan_path, output_path, open_browser):
+def render_plan(plan_path, output_path):
     plan = load_plan(plan_path)
     repository = repository_root()
     os.chdir(repository)
@@ -588,8 +587,6 @@ def render_plan(plan_path, output_path, open_browser):
         page = render_page(context, steps, repository, ignored)
     write_messages(context.plan_dir, commits)
     output_path.write_text(page, encoding="utf-8")
-    if open_browser and not webbrowser.open(output_path.as_uri()):
-        print(f"render: browser could not open {output_path}", file=sys.stderr)
     return output_path
 
 
@@ -597,12 +594,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("plan", type=Path, help="plan.json written by the commit skill")
     parser.add_argument("--output", type=Path, help="HTML file to write (default: index.html beside the plan)")
-    parser.add_argument("--no-open", action="store_true", help="write the page without opening it")
     args = parser.parse_args()
     plan_path = args.plan.resolve()
     output_path = args.output.resolve() if args.output else plan_path.parent / "index.html"
     try:
-        page = render_plan(plan_path, output_path, not args.no_open)
+        page = render_plan(plan_path, output_path)
     except (OSError, ValueError, RenderError) as error:
         print(f"render: {error}", file=sys.stderr)
         return 1

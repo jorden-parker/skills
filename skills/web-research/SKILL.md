@@ -93,6 +93,6 @@ Render the file with the `artifact` command beside this `SKILL.md`:
 
 The command goes **red** (exit 2, nothing rendered) and names each line where a marker has no Sources item, a source has no URL or is never cited, or a block under Answer or Findings has no marker. Fix the file from the ledger and rerun; a marker you cannot back from the ledger means the sentence goes, not the check. **Green** prints the HTML path and opens the page in the browser, each marker linked to its source.
 
-Then reply in the conversation with the Answer section word for word, markers and their Sources lines included, and the path to the page.
+Then run `open <path>` as its own command (no `&&`, no quotes). Reply in the conversation with the Answer section word for word, markers and their Sources lines included, and the path to the page.
 
 **Done when** the command is green and the reply carries the path it printed.

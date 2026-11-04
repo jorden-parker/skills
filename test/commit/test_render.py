@@ -51,7 +51,7 @@ class RenderTestCase(unittest.TestCase):
         head = self.git("rev-parse", "HEAD").strip()
         plan_path.write_text(json.dumps({"base": head, **plan}), encoding="utf-8")
         return subprocess.run(
-            [str(RENDER), "--no-open", str(plan_path), *extra],
+            [str(RENDER), str(plan_path), *extra],
             cwd=self.repo,
             capture_output=True,
             text=True,

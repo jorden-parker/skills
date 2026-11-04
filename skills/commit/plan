@@ -158,8 +158,6 @@ def handle_build(arguments):
         plan["excluded"] = document["excluded"]
     save(plan)
     render = [sys.executable, str(Path(__file__).resolve().parent / "render"), str(plan_path())]
-    if arguments.no_open:
-        render.append("--no-open")
     return subprocess.run(render, check=False).returncode
 
 
@@ -168,7 +166,6 @@ def build_parser():
     subcommands = parser.add_subparsers(dest="command", required=True)
     subcommands.add_parser("gather", help="print what is needed to plan commits").set_defaults(handler=handle_gather)
     build = subcommands.add_parser("build", help="read plan JSON on stdin, write plan.json and render the page")
-    build.add_argument("--no-open", action="store_true")
     build.set_defaults(handler=handle_build)
     return parser
 

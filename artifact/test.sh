@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Smoke tests for artifact/render. Never opens a browser.
+# Smoke tests for artifact/render. Render only writes the file and prints its path.
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -11,7 +11,7 @@ assert_eq() { if [ "$2" = "$3" ]; then ok "$1"; else nok "$1" "expected [$2] got
 assert_contains() { if grep -qF -- "$2" <<<"$3"; then ok "$1"; else nok "$1" "missing [$2]"; fi; }
 assert_not_contains() { if grep -qF -- "$2" <<<"$3"; then nok "$1" "unexpected [$2]"; else ok "$1"; fi; }
 
-run_render() { set +e; out="$("$RENDER" "$@" --no-open 2>&1)"; rc=$?; set -e; }
+run_render() { set +e; out="$("$RENDER" "$@" 2>&1)"; rc=$?; set -e; }
 T="$(cd "$(mktemp -d "${TMPDIR:-/tmp}/artifact-test.XXXXXX")" && pwd -P)" # physical path: render prints a resolved one
 
 cat > "$T/good.md" <<'MD'
@@ -84,6 +84,9 @@ assert_eq "unchecked render exits 0" 0 "$rc"
 # missing body
 run_render "$T/nope.md" --title t
 assert_eq "missing body exits 1" 1 "$rc"
+
+run_render "$T/good.md" --title t --output "$T/flag.html" --no-open
+assert_eq "--no-open is rejected" 2 "$rc"
 
 rm -rf "$T"
 printf '1..%d\n' "$n"

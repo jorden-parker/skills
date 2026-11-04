@@ -46,6 +46,8 @@ Output rule: say nothing in chat before or between commands and do not list comm
    - `ignore` and `excluded` are optional. `patch` and `body` are optional.
    - A `!` in the header sets `breaking`. Never add footers (no `BREAKING CHANGE:`, `Refs:`, trailers).
    - Leave `body` out unless the change is very complex and the header cannot carry the why; then keep it short plain text, wrapped at 72, no attribution lines.
-   - It writes `plan.json` under `/tmp/claude-skills/commit/` (or `$SKILLS_TMPDIR`), checks the plan against the working tree, replays every commit in a temporary index, writes the HTML page, opens it and prints its path. If it fails, fix the JSON and rerun. Never hand the user a plan that failed.
+   - It writes `plan.json` under `/tmp/claude-skills/commit/` (or `$SKILLS_TMPDIR`), checks the plan against the working tree, replays every commit in a temporary index, writes the HTML page and prints its path. If it fails, fix the JSON and rerun. Never hand the user a plan that failed.
 
-7. **Reply** with only the page path. The user runs the commands.
+7. **Open** the page: Run `open <path>` as its own command (no `&&`, no quotes).
+
+8. **Reply** with only the page path. The user runs the commands.

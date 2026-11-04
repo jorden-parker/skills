@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render a Markdown file as a portable Geist HTML artifact and open it in the browser."""
+"""Render a Markdown file as a portable Geist HTML artifact."""
 
 import argparse
 from datetime import date
@@ -7,10 +7,8 @@ import html
 import os
 from pathlib import Path
 import re
-import subprocess
 import sys
 import tempfile
-import webbrowser
 
 FENCE = re.compile(r"^\s*(```|~~~)")
 HEADING = re.compile(r"^(#{1,6})\s+(.*?)\s*#*\s*$")
@@ -140,7 +138,6 @@ def main():
                         help="Refuse to render unless every [n] marker has a numbered Sources item with a URL, and every item is cited")
     parser.add_argument("--cited-section", action="append", default=[], metavar="HEADING",
                         help="Implies --citations; every paragraph, table, and list item under HEADING must carry a marker. Repeatable")
-    parser.add_argument("--no-open", action="store_true", help="Write the file and print its path without opening a browser")
     args = parser.parse_args()
 
     try:
@@ -184,17 +181,6 @@ def main():
     except (OSError, UnicodeError) as error:
         parser.exit(1, f"artifact: {error}\n")
     print(path)
-    if args.no_open:
-        return
-    try:
-        if sys.platform == "darwin":
-            opened = subprocess.run(["open", path.as_uri()], check=False).returncode == 0
-        else:
-            opened = webbrowser.open(path.as_uri(), new=2)
-    except (OSError, webbrowser.Error):
-        opened = False
-    if not opened:
-        print(f"artifact: browser could not open {path}", file=sys.stderr)
 
 
 if __name__ == "__main__":
