@@ -51,6 +51,8 @@ starting, honor its STOP conditions, and update your row when done.
 | 014  | Add one `pnpm test` that checks everything, run it in CI, update DOMPurify  | P2       | S      | —          | TODO (stale: keep the existing unittest `test` script) |
 | 015  | Put every skill-script test under `test/`; document the repo layout         | P2       | S      | —          | DONE (59f8648..61ff417)                                |
 | 016  | Rename the `skills/` source folder to `catalog/`; `sync` repoints old links | P2       | M      | 015        | DONE (e5aee6b, 4bc6ae2)                                |
+| 017  | Add `--scope global\|project` and a garden scope key                        | P2       | M      | —          | TODO                                                   |
+| 018  | Browse every skills.sh skill in the garden; download and link any of them   | P2       | L      | 017        | TODO                                                   |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 
@@ -69,6 +71,10 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
   executor should add a standalone `skills/pr-draft/test.sh` modelled on
   `artifact/test.sh` instead, and wire it into 014's `test:render`.
 - 007 is independent and touches only Markdown.
+- 017 → 018: 018 installs registry skills into whichever scope 017 selects,
+  and its tests assume `Paths.Scope` exists. 017, 018 and 010–012 all touch
+  `internal/skills/state.go`, `internal/cli/set.go` and `internal/tui`; run
+  them one after another, never in parallel worktrees.
 
 ## Execution log
 
