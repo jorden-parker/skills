@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-PREVIEW = Path(__file__).resolve().parents[2] / "skills/jorden/pr-draft/preview"
+PREVIEW = Path(__file__).resolve().parents[2] / "catalog/jorden/pr-draft/preview"
 
 
 class PreviewTest(unittest.TestCase):

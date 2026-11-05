@@ -172,11 +172,8 @@ func (in *inspector) inspect(root, name, target string, check bool, now func() t
 	return res
 }
 
-// recognise returns the candidate an installed path belongs to: the skill a
-// dangling flat link now lives at, or the first whose known versions include
-// the copy's SKILL.md.
 func (in *inspector) recognise(target string) (string, bool) {
-	if id, ok := links.FlatLinkSkill(in.repo, in.ids, target); ok && !isRegular(filepath.Join(target, "SKILL.md")) {
+	if id, ok := links.OldLinkSkill(in.repo, in.ids, target); ok && !isRegular(filepath.Join(target, "SKILL.md")) {
 		return id, true
 	}
 	manifestPath := filepath.Join(target, "SKILL.md")
@@ -199,7 +196,7 @@ func (in *inspector) knownVersions(id string) map[string]struct{} {
 	if v, ok := in.versions[id]; ok {
 		return v
 	}
-	v := KnownVersions(in.repo.Dir, filepath.Join("skills", filepath.FromSlash(id), "SKILL.md"))
+	v := KnownVersions(in.repo.Dir, filepath.Join("catalog", filepath.FromSlash(id), "SKILL.md"))
 	in.versions[id] = v
 	return v
 }

@@ -39,6 +39,9 @@ func newRepo(t *testing.T) (skills.Repo, skills.Paths) {
 	}
 	gitIn(t, dir, "add", ".")
 	gitIn(t, dir, append(commit, "group by author")...)
+	gitIn(t, dir, "mv", "skills", "catalog")
+	gitIn(t, dir, append(commit, "rename to catalog")...)
+	src = filepath.Join(dir, "catalog", "me", "example")
 	if err := os.WriteFile(filepath.Join(src, "SKILL.md"), []byte("current instructions"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -79,9 +82,9 @@ func TestRootsAreDeduplicated(t *testing.T) {
 	}
 }
 
-func TestKnownVersionsFollowTheMoveIntoAnAuthorFolder(t *testing.T) {
+func TestKnownVersionsFollowEveryMove(t *testing.T) {
 	r, _ := newRepo(t)
-	v := KnownVersions(r.Dir, filepath.Join("skills", "me", "example", "SKILL.md"))
+	v := KnownVersions(r.Dir, filepath.Join("catalog", "me", "example", "SKILL.md"))
 	for _, body := range []string{oldInstructions, oldInstructions + "moved\n", "current instructions"} {
 		if _, ok := v[body]; !ok {
 			t.Fatalf("missing %q in %v", body, v)
@@ -145,7 +148,7 @@ func TestRunRelinksADanglingFlatLink(t *testing.T) {
 		t.Fatal(err)
 	}
 	target := filepath.Join(p.LinkDir, "example")
-	if err := os.Symlink(filepath.Join(r.SrcDir, "example"), target); err != nil {
+	if err := os.Symlink(filepath.Join(r.OldSrcDir, "example"), target); err != nil {
 		t.Fatal(err)
 	}
 	results, failed := Run(r, p, nil, true, nil)

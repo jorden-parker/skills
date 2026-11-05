@@ -17,8 +17,9 @@ var DefaultDir string
 
 // Repo is a checkout of this repository.
 type Repo struct {
-	Dir    string // the checkout
-	SrcDir string // Dir/skills, the source of every skill
+	Dir       string
+	SrcDir    string
+	OldSrcDir string
 }
 
 // Find resolves the checkout: the --repo flag, then SKILLS_REPO, then the
@@ -38,15 +39,13 @@ func Find(flag string) (Repo, error) {
 	if abs, err := filepath.Abs(dir); err == nil {
 		dir = abs
 	}
-	r := Repo{Dir: dir, SrcDir: filepath.Join(dir, "skills")}
+	r := Repo{Dir: dir, SrcDir: filepath.Join(dir, "catalog"), OldSrcDir: filepath.Join(dir, "skills")}
 	if fi, err := os.Stat(r.SrcDir); err != nil || !fi.IsDir() {
-		return r, fmt.Errorf("no skills/ directory in %s (set SKILLS_REPO or pass --repo)", dir)
+		return r, fmt.Errorf("no catalog/ directory in %s (set SKILLS_REPO or pass --repo)", dir)
 	}
 	return r, nil
 }
 
-// Names lists the ID (author/name) of every skills/<author>/<name>/ that
-// holds a SKILL.md, sorted.
 func (r Repo) Names() ([]string, error) {
 	authors, err := os.ReadDir(r.SrcDir)
 	if err != nil {

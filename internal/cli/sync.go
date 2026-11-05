@@ -48,7 +48,7 @@ skills. No prompts.`,
 					p.printf("  synced %s\n", e.Name)
 				}
 			}
-			removed, err := links.Prune(r.SrcDir, paths.LinkDirs())
+			removed, err := links.Prune(r, paths.LinkDirs())
 			for _, target := range removed {
 				p.printf("  removed %s (no longer in the repo)\n", target)
 			}

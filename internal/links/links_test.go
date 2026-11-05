@@ -13,7 +13,7 @@ func setup(t *testing.T) (skills.Repo, skills.Paths) {
 	t.Helper()
 	base := t.TempDir()
 	for _, id := range []string{"me/alpha", "me/beta", "other/beta"} {
-		src := filepath.Join(base, "repo", "skills", id)
+		src := filepath.Join(base, "repo", "catalog", id)
 		if err := os.MkdirAll(src, 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -134,7 +134,7 @@ func TestPruneRemovesOnlyDanglingLinksIntoRepo(t *testing.T) {
 		must(os.Symlink(filepath.Join(r.Dir, "elsewhere"), filepath.Join(dir, "other")))
 		must(os.Symlink(filepath.Join(r.Dir, "skills-old", "x"), filepath.Join(dir, "lookalike")))
 	}
-	removed, err := Prune(r.SrcDir, p.LinkDirs())
+	removed, err := Prune(r, p.LinkDirs())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,7 +174,7 @@ func TestMigrateRelinksFlatLinksToTheirAuthorFolder(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, name := range []string{"alpha", "beta", "gone"} {
-			if err := os.Symlink(filepath.Join(r.SrcDir, name), filepath.Join(dir, name)); err != nil {
+			if err := os.Symlink(filepath.Join(r.OldSrcDir, name), filepath.Join(dir, name)); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -190,7 +190,49 @@ func TestMigrateRelinksFlatLinksToTheirAuthorFolder(t *testing.T) {
 	if dest, _ := os.Readlink(filepath.Join(p.LinkDir, "alpha")); dest != r.Source("me/alpha") {
 		t.Fatalf("alpha -> %q", dest)
 	}
-	if dest, _ := os.Readlink(filepath.Join(p.LinkDir, "beta")); dest != filepath.Join(r.SrcDir, "beta") {
+	if dest, _ := os.Readlink(filepath.Join(p.LinkDir, "beta")); dest != filepath.Join(r.OldSrcDir, "beta") {
 		t.Fatalf("ambiguous beta was touched: %q", dest)
+	}
+}
+
+func TestMigrateRelinksAuthorLinksIntoTheOldSkillsFolder(t *testing.T) {
+	r, p := setup(t)
+	for _, dir := range p.LinkDirs() {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(filepath.Join(r.OldSrcDir, "me", "alpha"), filepath.Join(dir, "alpha")); err != nil {
+			t.Fatal(err)
+		}
+	}
+	relinked, err := Migrate(r, p.LinkDirs())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(relinked) != 2 {
+		t.Fatalf("relinked = %v", relinked)
+	}
+	for _, dir := range p.LinkDirs() {
+		if dest, _ := os.Readlink(filepath.Join(dir, "alpha")); dest != r.Source("me/alpha") {
+			t.Fatalf("%s/alpha -> %q", dir, dest)
+		}
+	}
+}
+
+func TestPruneRemovesDanglingLinksIntoTheOldSkillsFolder(t *testing.T) {
+	r, p := setup(t)
+	if err := os.MkdirAll(p.ClaudeLinkDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	stale := filepath.Join(p.ClaudeLinkDir, "gone")
+	if err := os.Symlink(filepath.Join(r.OldSrcDir, "me", "gone"), stale); err != nil {
+		t.Fatal(err)
+	}
+	removed, err := Prune(r, p.LinkDirs())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(removed, []string{stale}) || isLink(stale) {
+		t.Fatalf("removed = %v", removed)
 	}
 }

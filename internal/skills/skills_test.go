@@ -14,7 +14,7 @@ func newRepo(t *testing.T) Repo {
 	for _, id := range []string{"me/beta", "me/alpha"} {
 		writeSkill(t, dir, id)
 	}
-	if err := os.MkdirAll(filepath.Join(dir, "skills", "me", "notes-without-manifest"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, "catalog", "me", "notes-without-manifest"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	r, err := Find(dir)
@@ -27,7 +27,7 @@ func newRepo(t *testing.T) Repo {
 func writeSkill(t *testing.T, dir, id string) {
 	t.Helper()
 	name := filepath.Base(id)
-	src := filepath.Join(dir, "skills", id)
+	src := filepath.Join(dir, "catalog", id)
 	if err := os.MkdirAll(src, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +99,7 @@ func TestFindOrder(t *testing.T) {
 	DefaultDir = ""
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	if err := os.MkdirAll(filepath.Join(home, "src", "skills", "skills"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(home, "src", "skills", "catalog"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	got, err = Find("")
@@ -111,8 +111,19 @@ func TestFindOrder(t *testing.T) {
 func TestFindRejectsMissingSkillsDir(t *testing.T) {
 	dir := t.TempDir()
 	_, err := Find(dir)
-	if err == nil || !strings.Contains(err.Error(), "no skills/ directory in "+dir) || !strings.Contains(err.Error(), "SKILLS_REPO") {
+	if err == nil || !strings.Contains(err.Error(), "no catalog/ directory in "+dir) || !strings.Contains(err.Error(), "SKILLS_REPO") {
 		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestFindNamesTheCatalogAndTheOldSkillsFolder(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "catalog"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	r, err := Find(dir)
+	if err != nil || r.SrcDir != filepath.Join(dir, "catalog") || r.OldSrcDir != filepath.Join(dir, "skills") {
+		t.Fatalf("Find = %+v, %v", r, err)
 	}
 }
 

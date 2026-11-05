@@ -40,7 +40,7 @@ func newHarness(t *testing.T) *harness {
 func (h *harness) writeSkill(id string) {
 	h.t.Helper()
 	name := filepath.Base(id)
-	src := filepath.Join(h.repo, "skills", id)
+	src := filepath.Join(h.repo, "catalog", id)
 	if err := os.MkdirAll(src, 0o755); err != nil {
 		h.t.Fatal(err)
 	}
@@ -146,7 +146,7 @@ func symlink(t *testing.T, old, link string) {
 func TestListShowsStates(t *testing.T) {
 	h := newHarness(t)
 	out := h.ok("list")
-	if !strings.Contains(out, "Skills in "+filepath.Join(h.repo, "skills")) || !strings.Contains(out, "alpha skill") {
+	if !strings.Contains(out, "Skills in "+filepath.Join(h.repo, "catalog")) || !strings.Contains(out, "alpha skill") {
 		t.Fatalf("list:\n%s", out)
 	}
 	if !strings.Contains(out, h.links+" and "+h.claudeLinks+"; off is not") {
@@ -164,7 +164,7 @@ func TestAddCreatesLinkAndRemoveDeletesIt(t *testing.T) {
 		if !isLink(filepath.Join(dir, "alpha")) {
 			t.Fatalf("%s/alpha not linked", dir)
 		}
-		resolves(t, filepath.Join(dir, "alpha"), filepath.Join(h.repo, "skills", "me", "alpha"))
+		resolves(t, filepath.Join(dir, "alpha"), filepath.Join(h.repo, "catalog", "me", "alpha"))
 	}
 	if isLink(filepath.Join(h.links, "beta")) {
 		t.Fatal("beta linked")
@@ -224,7 +224,7 @@ func TestPartialStatesKeepLinkAndWriteOverride(t *testing.T) {
 func TestClaudeOnlyLinkDoesNotControlStateAndIsRemoved(t *testing.T) {
 	h := newHarness(t)
 	link := filepath.Join(h.claudeLinks, "alpha")
-	symlink(t, filepath.Join(h.repo, "skills", "me", "alpha"), link)
+	symlink(t, filepath.Join(h.repo, "catalog", "me", "alpha"), link)
 	if got := h.states(); !reflect.DeepEqual(got, map[string]string{"alpha": "off", "beta": "off"}) {
 		t.Fatalf("states = %v", got)
 	}
@@ -242,7 +242,7 @@ func TestDefaultClaudeDirectory(t *testing.T) {
 	if !isLink(link) {
 		t.Fatal("not linked into ~/.claude/skills")
 	}
-	resolves(t, link, filepath.Join(h.repo, "skills", "me", "alpha"))
+	resolves(t, link, filepath.Join(h.repo, "catalog", "me", "alpha"))
 	h.ok("remove", "alpha")
 	if isLink(link) {
 		t.Fatal("still linked")
@@ -278,7 +278,7 @@ func TestRealClaudeDirectoryIsPreserved(t *testing.T) {
 
 func TestSyncAddsMissingClaudeLinkForEnabledSkillOnly(t *testing.T) {
 	h := newHarness(t)
-	symlink(t, filepath.Join(h.repo, "skills", "me", "alpha"), filepath.Join(h.links, "alpha"))
+	symlink(t, filepath.Join(h.repo, "catalog", "me", "alpha"), filepath.Join(h.links, "alpha"))
 	out := h.ok("sync")
 	if !strings.Contains(out, "Syncing links in "+h.links+" and "+h.claudeLinks+"\n  synced me/alpha\n") {
 		t.Fatalf("sync:\n%s", out)
@@ -286,7 +286,7 @@ func TestSyncAddsMissingClaudeLinkForEnabledSkillOnly(t *testing.T) {
 	if !isLink(filepath.Join(h.claudeLinks, "alpha")) {
 		t.Fatal("claude link not added")
 	}
-	resolves(t, filepath.Join(h.claudeLinks, "alpha"), filepath.Join(h.repo, "skills", "me", "alpha"))
+	resolves(t, filepath.Join(h.claudeLinks, "alpha"), filepath.Join(h.repo, "catalog", "me", "alpha"))
 	if _, err := os.Lstat(filepath.Join(h.claudeLinks, "beta")); err == nil {
 		t.Fatal("sync enabled beta")
 	}
@@ -322,7 +322,7 @@ func TestSyncRepairsStaleLinksAndPrunesDanglingOnes(t *testing.T) {
 		t.Fatalf("sync:\n%s", out)
 	}
 	for _, dir := range []string{h.links, h.claudeLinks} {
-		resolves(t, filepath.Join(dir, "alpha"), filepath.Join(h.repo, "skills", "me", "alpha"))
+		resolves(t, filepath.Join(dir, "alpha"), filepath.Join(h.repo, "catalog", "me", "alpha"))
 		if isLink(filepath.Join(dir, "gone")) {
 			t.Fatalf("%s/gone not pruned", dir)
 		}
@@ -357,7 +357,7 @@ func TestMissingRepoIsHelpful(t *testing.T) {
 	h := newHarness(t)
 	h.repo = filepath.Join(h.base, "nowhere")
 	_, errOut, code := h.run("list")
-	if code != 1 || !strings.Contains(errOut, "no skills/ directory in "+h.repo+" (set SKILLS_REPO or pass --repo)") {
+	if code != 1 || !strings.Contains(errOut, "no catalog/ directory in "+h.repo+" (set SKILLS_REPO or pass --repo)") {
 		t.Fatalf("exit %d, stderr %q", code, errOut)
 	}
 }
@@ -382,10 +382,10 @@ type refreshHarness struct {
 func newRefreshHarness(t *testing.T) *refreshHarness {
 	t.Helper()
 	h := &refreshHarness{harness: newHarness(t)}
-	if err := os.RemoveAll(filepath.Join(h.repo, "skills", "me")); err != nil {
+	if err := os.RemoveAll(filepath.Join(h.repo, "catalog", "me")); err != nil {
 		t.Fatal(err)
 	}
-	h.source = filepath.Join(h.repo, "skills", "me", "example")
+	h.source = filepath.Join(h.repo, "catalog", "me", "example")
 	if err := os.MkdirAll(h.source, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -536,7 +536,7 @@ func TestAddSwitchesOffTheSameNameSibling(t *testing.T) {
 	h.ok("set", "me/alpha=name-only")
 	out := h.ok("add", "other/alpha")
 	for _, dir := range []string{h.links, h.claudeLinks} {
-		resolves(t, filepath.Join(dir, "alpha"), filepath.Join(h.repo, "skills", "other", "alpha"))
+		resolves(t, filepath.Join(dir, "alpha"), filepath.Join(h.repo, "catalog", "other", "alpha"))
 	}
 	if !strings.Contains(out, "  me/alpha    name-only           -> off") || !strings.Contains(out, "  other/alpha off                 -> on") {
 		t.Fatalf("add:\n%s", out)
@@ -560,7 +560,7 @@ func TestSyncRelinksFlatLinksIntoAuthorFolders(t *testing.T) {
 	}
 	out := h.ok("sync")
 	for _, dir := range []string{h.links, h.claudeLinks} {
-		resolves(t, filepath.Join(dir, "alpha"), filepath.Join(h.repo, "skills", "me", "alpha"))
+		resolves(t, filepath.Join(dir, "alpha"), filepath.Join(h.repo, "catalog", "me", "alpha"))
 	}
 	if strings.Contains(out, "removed") {
 		t.Fatalf("sync pruned a link it should relink:\n%s", out)

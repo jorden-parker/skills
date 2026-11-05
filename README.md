@@ -6,7 +6,7 @@ Claude Code skills, cloned onto a machine and switched on selectively.
 curl -fsSL https://raw.githubusercontent.com/jorden-parker/skills/main/install.sh | bash
 ```
 
-That clones the repo into `~/src/skills` (or `$SKILLS_REPO`), builds the `skills` command with Go, and installs it to `~/.local/bin`. From an existing checkout, run `./install.sh` instead; it installs that checkout. To build without installing: `go build -o bin/skills .` (the output goes in `bin/` because the `skills/` directory already takes the name).
+That clones the repo into `~/src/skills` (or `$SKILLS_REPO`), builds the `skills` command with Go, and installs it to `~/.local/bin`. From an existing checkout, run `./install.sh` instead; it installs that checkout. To build without installing: `go build -o bin/skills .`.
 
 The command symlinks the skills you pick into both `~/.agents/skills` and `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills`. It reads `~/.agents/skills` to determine which skills are installed. Turning a skill off removes its links from both directories. Nothing is copied, so `git pull` updates a linked skill in place. Skills new to the repo stay off until you add them. `sync` also adds missing Claude links for enabled skills; it does not enable new skills. Existing installations outside these two directories are left untouched.
 
@@ -30,6 +30,8 @@ skills refresh new-project    # refresh one skill
 skills refresh --check        # inspect without changing files
 ```
 
+After pulling a change that moves skills, such as the move from `skills/` to `catalog/`, rebuild with `./install.sh` and run `skills sync`; it repoints old links.
+
 `refresh` needs Git. It checks `~/.agents/skills`,
 `${CODEX_HOME:-$HOME/.codex}/skills`, and
 `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills`. Recognised copies are backed up under
@@ -49,7 +51,7 @@ Redirected output is plain text, and `NO_COLOR` disables colour. Bare `skills` w
 
 ### Where the checkout lives
 
-Links point into `<checkout>/skills/<author>/<name>`, so the command needs to know where the checkout is. It looks, in order, at `--repo PATH` (or `-C PATH`), `$SKILLS_REPO`, the path baked in when `install.sh` built it, then `~/src/skills`. A path without a `skills/` directory is an error that names the path.
+Links point into `<checkout>/catalog/<author>/<name>`, so the command needs to know where the checkout is. It looks, in order, at `--repo PATH` (or `-C PATH`), `$SKILLS_REPO`, the path baked in when `install.sh` built it, then `~/src/skills`. A path without a `catalog/` directory is an error that names the path.
 
 ### The skill garden
 
@@ -73,11 +75,11 @@ Saving writes the links and `settings.json`, keeps a `.bak` of the previous sett
 
 ### PR description preview
 
-`/pr-draft` describes the current working tree, committed or not, and renders the description as a local HTML page. It makes no Git or GitHub changes. It uses [a reusable body template](skills/jorden/pr-draft/assets/body.md) when the target repository has none. Preview a body file directly:
+`/pr-draft` describes the current working tree, committed or not, and renders the description as a local HTML page. It makes no Git or GitHub changes. It uses [a reusable body template](catalog/jorden/pr-draft/assets/body.md) when the target repository has none. Preview a body file directly:
 
 ```sh
 pnpm install
-./skills/jorden/pr-draft/preview /tmp/claude-skills/pr-draft/pr-body.md --title "Cache the resolved config" --output /tmp/claude-skills/pr-draft/pr-preview.html
+./catalog/jorden/pr-draft/preview /tmp/claude-skills/pr-draft/pr-body.md --title "Cache the resolved config" --output /tmp/claude-skills/pr-draft/pr-preview.html
 ```
 
 The draft follows the target repository's PR template, preserving its sections and checklists. Pass the completed body to preview it. Omit the body path to preview the local repository's template, using `--repo <path>` when outside that repository; the bundled template is the fallback when none exists. If several templates exist, pass the chosen file explicitly.
@@ -96,20 +98,20 @@ It needs Python 3 and the same one-time `pnpm install`.
 
 ## Skills
 
-| Skill                                         | What it does                                                                                                    |
-| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| [`pr-draft`](skills/jorden/pr-draft/)         | Opens a draft PR for the current branch, or updates the existing one. `/`-invoked only.                         |
-| [`geist`](skills/jorden/geist/)               | Vercel's Geist Design System — real tokens, type scale, component recipes.                                      |
-| [`new-project`](skills/jorden/new-project/)   | Initialises tooling in an existing project or scaffolds a new one, inferred from the directory.                 |
-| [`web-research`](skills/jorden/web-research/) | Researches a question on the live web and shows the findings as a cited page. `/`-invoked only.                 |
-| [`commit`](skills/jorden/commit/)             | Sorts changes into Conventional Commits as copyable commands on a local page. `/`-invoked only.                 |
-| [`handoff`](skills/jorden/handoff/)           | Compacts the conversation into a handoff document for the next agent. Same name as Matt’s; one is on at a time. |
+| Skill                                          | What it does                                                                                                    |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| [`pr-draft`](catalog/jorden/pr-draft/)         | Opens a draft PR for the current branch, or updates the existing one. `/`-invoked only.                         |
+| [`geist`](catalog/jorden/geist/)               | Vercel's Geist Design System — real tokens, type scale, component recipes.                                      |
+| [`new-project`](catalog/jorden/new-project/)   | Initialises tooling in an existing project or scaffolds a new one, inferred from the directory.                 |
+| [`web-research`](catalog/jorden/web-research/) | Researches a question on the live web and shows the findings as a cited page. `/`-invoked only.                 |
+| [`commit`](catalog/jorden/commit/)             | Sorts changes into Conventional Commits as copyable commands on a local page. `/`-invoked only.                 |
+| [`handoff`](catalog/jorden/handoff/)           | Compacts the conversation into a handoff document for the next agent. Same name as Matt’s; one is on at a time. |
 
 ### Upstream skills
 
 This checkout also includes all 29 published skills from [Matt Pocock](https://github.com/mattpocock/skills) and [shadcn’s `improve`](https://github.com/shadcn/improve). Matt’s `in-progress` directory is excluded. Each skill includes its supporting files and upstream MIT license.
 
-These are editable snapshots under `skills/mattpocock/<name>/` and `skills/shadcn/improve/`, available through the same picker as the local skills. New skills stay off until selected:
+These are editable snapshots under `catalog/mattpocock/<name>/` and `catalog/shadcn/improve/`, available through the same picker as the local skills. New skills stay off until selected:
 
 ```sh
 skills                          # select the skills you want
@@ -122,7 +124,7 @@ For Matt’s engineering workflow, enable `setup-matt-pocock-skills` and run `/s
 
 ### Authors and same-name skills
 
-Each skill lives in its author's folder: `skills/jorden/` for this repo's own, `skills/mattpocock/` and `skills/shadcn/` for upstream snapshots. A skill's ID is `author/name`, and it is linked as `name`. Two authors may ship the same name, such as `mattpocock/handoff` and `jorden/handoff`, but only one can be on at a time: turning one on switches its sibling off. A bare name works wherever it is unique:
+Each skill lives in its author's folder: `catalog/jorden/` for this repo's own, `catalog/mattpocock/` and `catalog/shadcn/` for upstream snapshots. A skill's ID is `author/name`, and it is linked as `name`. Two authors may ship the same name, such as `mattpocock/handoff` and `jorden/handoff`, but only one can be on at a time: turning one on switches its sibling off. A bare name works wherever it is unique:
 
 ```sh
 skills add jorden/handoff       # switches mattpocock/handoff off
@@ -132,7 +134,7 @@ skills add geist                # unique, so the author can be left out
 ## Repo layout
 
 ```
-skills/<author>/<name>/  the skills themselves, grouped by author; linked into agent apps, so no tests here
+catalog/<author>/<name>/  the skills themselves, grouped by author; linked into agent apps, so no tests here
 main.go, internal/       the skills command (Go + Charm); each package's tests sit beside it
 install.sh               builds and installs the command
 artifact/                the shared Markdown-to-page renderer and its test.sh

@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-# Build the skills command from this checkout (or a fresh clone) and install
-# it to ~/.local/bin. The checkout path is baked into the binary so `skills`
-# finds its skills/ directory from anywhere.
 set -euo pipefail
 
 die() { printf 'Install failed: %s\n' "$*" >&2; exit 1; }

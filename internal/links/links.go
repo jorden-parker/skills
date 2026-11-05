@@ -89,17 +89,14 @@ func Apply(r skills.Repo, p skills.Paths, entries []skills.Entry, warn Warn) ([]
 	return out, nil
 }
 
-// Migrate relinks dangling links to a flat skills/<name> path, left from
-// before skills moved into author folders, to the one skill with that name.
-// It returns the paths it relinked; links to an ambiguous name are left alone.
 func Migrate(r skills.Repo, dirs []string) ([]string, error) {
 	ids, err := r.Names()
 	if err != nil {
 		return nil, err
 	}
 	var relinked []string
-	for _, target := range danglingLinksInto(r.SrcDir, dirs) {
-		id, ok := FlatLinkSkill(r, ids, target)
+	for _, target := range danglingLinksInto(r.OldSrcDir, dirs) {
+		id, ok := OldLinkSkill(r, ids, target)
 		if !ok {
 			continue
 		}
@@ -114,20 +111,21 @@ func Migrate(r skills.Repo, dirs []string) ([]string, error) {
 	return relinked, nil
 }
 
-// FlatLinkSkill reports the skill a link to a flat skills/<name> path now
-// belongs to, when exactly one of ids has that name.
-func FlatLinkSkill(r skills.Repo, ids []string, link string) (string, bool) {
+func OldLinkSkill(r skills.Repo, ids []string, link string) (string, bool) {
 	dest, err := os.Readlink(link)
 	if err != nil {
 		return "", false
 	}
-	flatName, ok := strings.CutPrefix(dest, r.SrcDir+string(filepath.Separator))
+	rest, ok := strings.CutPrefix(dest, r.OldSrcDir+string(filepath.Separator))
 	if !ok {
 		return "", false
 	}
+	if id := filepath.ToSlash(rest); r.Has(id) {
+		return id, true
+	}
 	var matches []string
 	for _, id := range ids {
-		if skills.LinkName(id) == flatName {
+		if skills.LinkName(id) == rest {
 			matches = append(matches, id)
 		}
 	}
@@ -137,15 +135,15 @@ func FlatLinkSkill(r skills.Repo, ids []string, link string) (string, bool) {
 	return matches[0], true
 }
 
-// Prune removes dangling symlinks in dirs that point under srcDir and
-// returns the paths it removed. Links elsewhere are left alone.
-func Prune(srcDir string, dirs []string) ([]string, error) {
+func Prune(r skills.Repo, dirs []string) ([]string, error) {
 	var removed []string
-	for _, target := range danglingLinksInto(srcDir, dirs) {
-		if err := os.Remove(target); err != nil {
-			return removed, err
+	for _, srcDir := range []string{r.SrcDir, r.OldSrcDir} {
+		for _, target := range danglingLinksInto(srcDir, dirs) {
+			if err := os.Remove(target); err != nil {
+				return removed, err
+			}
+			removed = append(removed, target)
 		}
-		removed = append(removed, target)
 	}
 	return removed, nil
 }

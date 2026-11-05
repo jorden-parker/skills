@@ -5,8 +5,8 @@ import subprocess
 import tempfile
 import unittest
 
-PLAN = Path(__file__).resolve().parents[2] / "skills" / "jorden" / "commit" / "plan"
-RENDER = Path(__file__).resolve().parents[2] / "skills" / "jorden" / "commit" / "render"
+PLAN = Path(__file__).resolve().parents[2] / "catalog" / "jorden" / "commit" / "plan"
+RENDER = Path(__file__).resolve().parents[2] / "catalog" / "jorden" / "commit" / "render"
 
 
 class PlanTestCase(unittest.TestCase):

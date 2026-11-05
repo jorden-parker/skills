@@ -45,7 +45,7 @@ func newFixture(t *testing.T) *fixture {
 func writeSkill(t *testing.T, dir, id string) {
 	t.Helper()
 	name := filepath.Base(id)
-	src := filepath.Join(dir, "skills", id)
+	src := filepath.Join(dir, "catalog", id)
 	if err := os.MkdirAll(src, 0o755); err != nil {
 		t.Fatal(err)
 	}

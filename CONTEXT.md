@@ -11,11 +11,11 @@ A directory containing a `SKILL.md`, holding instructions an agent loads on dema
 _Avoid_: command, plugin, prompt
 
 **Skills Directory**:
-The `skills/` folder in this repo, grouped by Author. The authoritative copy of every skill.
+The `catalog/` folder in this repo, grouped by Author. The authoritative copy of every skill.
 _Avoid_: library, catalogue
 
 **Author**:
-Whoever wrote a Skill, and the folder it lives in: `skills/<author>/<name>/`. A Skill's ID is `author/name`.
+Whoever wrote a Skill, and the folder it lives in: `catalog/<author>/<name>/`. A Skill's ID is `author/name`.
 _Avoid_: owner, source, vendor
 
 **Link name**:

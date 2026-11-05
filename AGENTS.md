@@ -1,6 +1,6 @@
 # Updating skills
 
-`skills/<author>/<name>/` is the source of truth; refresh takes the ID
+`catalog/<author>/<name>/` is the source of truth; refresh takes the ID
 (`author/name`) or a unique bare name. After updating a skill, run
 `skills refresh <name>` and then `skills refresh --check <name>` before reporting
 completion. Use `skills refresh` without names to refresh all repo skills. Without

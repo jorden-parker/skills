@@ -7,7 +7,7 @@ import subprocess
 import tempfile
 import unittest
 
-RENDER = Path(__file__).resolve().parents[2] / "skills" / "jorden" / "commit" / "render"
+RENDER = Path(__file__).resolve().parents[2] / "catalog" / "jorden" / "commit" / "render"
 TAG_PATTERN = re.compile(r"<[^>]+>")
 
 
