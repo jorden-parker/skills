@@ -61,6 +61,8 @@ type Paths struct {
 	ClaudeLinkDir string // ClaudeDir/skills
 	Settings      string // ClaudeDir/settings.json
 	CodexDir      string // CODEX_HOME or ~/.codex
+	RegistryDir   string
+	RegistryIndex string
 }
 
 func PathsFor(scope Scope, dir string) (Paths, error) {
@@ -109,7 +111,16 @@ func DefaultPaths() Paths {
 		ClaudeLinkDir: filepath.Join(claude, "skills"),
 		Settings:      filepath.Join(claude, "settings.json"),
 		CodexDir:      codex,
+		RegistryDir:   filepath.Join(xdgDir("XDG_DATA_HOME", filepath.Join(home, ".local", "share")), "skills", "registry"),
+		RegistryIndex: filepath.Join(xdgDir("XDG_CACHE_HOME", filepath.Join(home, ".cache")), "skills", "skills-sh-index.txt"),
 	}
+}
+
+func xdgDir(envName, fallback string) string {
+	if dir := os.Getenv(envName); dir != "" {
+		return dir
+	}
+	return fallback
 }
 
 // LinkDirs are the two discovery directories a skill is linked into.

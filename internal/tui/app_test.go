@@ -39,6 +39,8 @@ func newFixture(t *testing.T) *fixture {
 	t.Setenv("HOME", filepath.Join(base, "home"))
 	t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join(base, "claude"))
 	t.Setenv("CODEX_HOME", filepath.Join(base, "codex"))
+	t.Setenv("XDG_DATA_HOME", "")
+	t.Setenv("XDG_CACHE_HOME", "")
 	return &fixture{t: t, base: base, repo: r, paths: skills.DefaultPaths()}
 }
 

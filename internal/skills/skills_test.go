@@ -264,6 +264,40 @@ func TestDefaultPathsAreGlobal(t *testing.T) {
 	}
 }
 
+func TestDefaultPathsRegistryLocations(t *testing.T) {
+	t.Setenv("HOME", "/h")
+	t.Setenv("XDG_DATA_HOME", "")
+	t.Setenv("XDG_CACHE_HOME", "")
+	got := DefaultPaths()
+	if got.RegistryDir != "/h/.local/share/skills/registry" || got.RegistryIndex != "/h/.cache/skills/skills-sh-index.txt" {
+		t.Fatalf("registry paths = %q, %q", got.RegistryDir, got.RegistryIndex)
+	}
+}
+
+func TestDefaultPathsRegistryHonoursXDG(t *testing.T) {
+	t.Setenv("HOME", "/h")
+	t.Setenv("XDG_DATA_HOME", "/d")
+	t.Setenv("XDG_CACHE_HOME", "/c")
+	got := DefaultPaths()
+	if got.RegistryDir != "/d/skills/registry" || got.RegistryIndex != "/c/skills/skills-sh-index.txt" {
+		t.Fatalf("registry paths = %q, %q", got.RegistryDir, got.RegistryIndex)
+	}
+}
+
+func TestPathsForProjectKeepsSharedRegistryCache(t *testing.T) {
+	root := t.TempDir()
+	gitInit(t, root)
+	t.Setenv("XDG_DATA_HOME", "/d")
+	t.Setenv("XDG_CACHE_HOME", "/c")
+	got, err := PathsFor(ProjectScope, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.RegistryDir != "/d/skills/registry" || got.RegistryIndex != "/c/skills/skills-sh-index.txt" {
+		t.Fatalf("project registry paths = %q, %q", got.RegistryDir, got.RegistryIndex)
+	}
+}
+
 func gitInit(t *testing.T, dir string) {
 	t.Helper()
 	if out, err := exec.Command("git", "init", "-q", dir).CombinedOutput(); err != nil {

@@ -29,6 +29,8 @@ func newHarness(t *testing.T) *harness {
 	t.Setenv("HOME", filepath.Join(base, "home"))
 	t.Setenv("CLAUDE_CONFIG_DIR", claude)
 	t.Setenv("CODEX_HOME", filepath.Join(base, "codex"))
+	t.Setenv("XDG_DATA_HOME", "")
+	t.Setenv("XDG_CACHE_HOME", "")
 	t.Setenv("SKILLS_REPO", "")
 	t.Setenv("NO_COLOR", "1")
 	h.links = filepath.Join(base, "home", ".agents", "skills")
