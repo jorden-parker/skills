@@ -18,6 +18,7 @@ func newRepo(t *testing.T) Repo {
 	if err := os.MkdirAll(filepath.Join(dir, "catalog", "me", "notes-without-manifest"), 0o755); err != nil {
 		t.Fatal(err)
 	}
+	t.Setenv("XDG_DATA_HOME", filepath.Join(t.TempDir(), "data"))
 	r, err := Find(dir)
 	if err != nil {
 		t.Fatal(err)
@@ -352,5 +353,111 @@ func TestPathsForGlobalIgnoresDirectory(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got, DefaultPaths()) {
 		t.Fatalf("PathsFor(global) = %+v, want %+v", got, DefaultPaths())
+	}
+}
+
+func writeRegistrySkill(t *testing.T, r Repo, id string) {
+	t.Helper()
+	dir := filepath.Join(r.RegistryDir, filepath.FromSlash(id))
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := "---\nname: " + LinkName(id) + "\ndescription: registry skill\n---\n"
+	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRegistryIDsHaveThreeSafeSegments(t *testing.T) {
+	want := map[string]bool{
+		"acme/tools/lint": true,
+		"me/alpha":        false,
+		"a/b/c/d":         false,
+		"a/../c":          false,
+		"a/b/":            false,
+	}
+	for id, expected := range want {
+		if got := IsRegistryID(id); got != expected {
+			t.Fatalf("IsRegistryID(%q) = %v, want %v", id, got, expected)
+		}
+	}
+}
+
+func TestRegistrySourceAndHas(t *testing.T) {
+	r := newRepo(t)
+	writeRegistrySkill(t, r, "acme/tools/lint")
+	if got, want := r.Source("acme/tools/lint"), filepath.Join(r.RegistryDir, "acme", "tools", "lint"); got != want {
+		t.Fatalf("Source = %s, want %s", got, want)
+	}
+	if got, want := r.Source("me/alpha"), filepath.Join(r.SrcDir, "me", "alpha"); got != want {
+		t.Fatalf("catalog Source = %s, want %s", got, want)
+	}
+	if !r.Has("acme/tools/lint") {
+		t.Fatal("Has(acme/tools/lint) = false")
+	}
+	if r.Has("acme/tools/missing") {
+		t.Fatal("Has(acme/tools/missing) = true")
+	}
+}
+
+func TestDownloadedListsOnlySkillsWithManifest(t *testing.T) {
+	r := newRepo(t)
+	writeRegistrySkill(t, r, "acme/tools/lint")
+	if err := os.MkdirAll(filepath.Join(r.RegistryDir, "acme", "tools", "empty"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	got, err := r.Downloaded()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"acme/tools/lint"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("Downloaded = %v, want %v", got, want)
+	}
+}
+
+func TestRegistrySkillDescribeAndManifest(t *testing.T) {
+	r := newRepo(t)
+	writeRegistrySkill(t, r, "acme/tools/lint")
+	if got := r.Describe("acme/tools/lint"); got != "registry skill" {
+		t.Fatalf("Describe = %q", got)
+	}
+	body, err := r.Manifest("acme/tools/lint")
+	if err != nil || !strings.Contains(body, "name: lint") {
+		t.Fatalf("Manifest = %q, %v", body, err)
+	}
+}
+
+func TestResolveAcceptsRegistryIDsButNotBareRegistryNames(t *testing.T) {
+	r := newRepo(t)
+	writeRegistrySkill(t, r, "acme/tools/lint")
+	if got, err := r.Resolve("acme/tools/other"); err != nil || got != "acme/tools/other" {
+		t.Fatalf("Resolve(registry ID) = %q, %v", got, err)
+	}
+	if _, err := r.Resolve("lint"); err == nil || err.Error() != "no such skill: lint" {
+		t.Fatalf("Resolve(bare registry name) err = %v", err)
+	}
+}
+
+func TestLoadStatesIncludesDownloadedRegistrySkills(t *testing.T) {
+	r := newRepo(t)
+	writeRegistrySkill(t, r, "acme/tools/lint")
+	writeSkill(t, r.Dir, "me/lint")
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join(home, "claude"))
+	p := DefaultPaths()
+	if err := os.MkdirAll(p.LinkDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(r.Source("acme/tools/lint"), filepath.Join(p.LinkDir, "lint")); err != nil {
+		t.Fatal(err)
+	}
+	got, err := LoadStates(r, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []Entry{{"acme/tools/lint", On}, {"me/alpha", Off}, {"me/beta", Off}, {"me/lint", Off}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("states = %v, want %v", got, want)
 	}
 }

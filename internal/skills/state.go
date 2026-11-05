@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/jorden-parker/skills/internal/settings"
@@ -137,7 +138,7 @@ type Entry struct {
 // same-name sibling. A linked skill takes its override from settings.json,
 // else on. Unlinked skills are off.
 func LoadStates(r Repo, p Paths) ([]Entry, error) {
-	ids, err := r.Names()
+	ids, err := installableIDs(r)
 	if err != nil {
 		return nil, err
 	}
@@ -154,6 +155,20 @@ func LoadStates(r Repo, p Paths) ([]Entry, error) {
 		out = append(out, Entry{Name: id, State: st})
 	}
 	return out, nil
+}
+
+func installableIDs(r Repo) ([]string, error) {
+	catalog, err := r.Names()
+	if err != nil {
+		return nil, err
+	}
+	downloaded, err := r.Downloaded()
+	if err != nil {
+		return nil, err
+	}
+	ids := append(catalog, downloaded...)
+	sort.Strings(ids)
+	return ids, nil
 }
 
 func linkedTo(r Repo, p Paths, ids []string, id string) bool {
