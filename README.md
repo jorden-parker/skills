@@ -132,12 +132,14 @@ skills add geist                # unique, so the author can be left out
 ## Repo layout
 
 ```
-skills/<author>/<name>/  the skills themselves, grouped by author
-main.go, internal/       the skills command (Go + Charm)
+skills/<author>/<name>/  the skills themselves, grouped by author; linked into agent apps, so no tests here
+main.go, internal/       the skills command (Go + Charm); each package's tests sit beside it
 install.sh               builds and installs the command
-artifact/                the shared Markdown-to-page renderer
+artifact/                the shared Markdown-to-page renderer and its test.sh
+test/<skill>/            Python tests for skill scripts; pnpm test runs them
 CONTEXT.md               glossary
 docs/adr/                decisions worth remembering
+plans/                   implementation plans and their status
 ```
 
 ## Notes
