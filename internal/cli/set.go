@@ -11,30 +11,30 @@ import (
 	"github.com/jorden-parker/skills/internal/skills"
 )
 
-func addCmd(find finder) *cobra.Command {
+func addCmd(find finder, pathsFor pathsFinder) *cobra.Command {
 	return &cobra.Command{
 		Use:   "add NAME...",
 		Short: "Link skills into ~/.agents/skills and Claude's skills directory",
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return applyStates(cmd, find, withState(args, skills.On))
+			return applyStates(cmd, find, pathsFor, withState(args, skills.On))
 		},
 	}
 }
 
-func removeCmd(find finder) *cobra.Command {
+func removeCmd(find finder, pathsFor pathsFinder) *cobra.Command {
 	return &cobra.Command{
 		Use:     "remove NAME...",
 		Aliases: []string{"rm", "unlink"},
 		Short:   "Remove skills' links from both directories",
 		Args:    cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return applyStates(cmd, find, withState(args, skills.Off))
+			return applyStates(cmd, find, pathsFor, withState(args, skills.Off))
 		},
 	}
 }
 
-func setCmd(find finder) *cobra.Command {
+func setCmd(find finder, pathsFor pathsFinder) *cobra.Command {
 	return &cobra.Command{
 		Use:   "set NAME STATE | NAME=STATE...",
 		Short: "Set a skill's state directly: on, off, name-only or user-invocable-only",
@@ -46,7 +46,7 @@ func setCmd(find finder) *cobra.Command {
 			} else {
 				pairs = args
 			}
-			return applyStates(cmd, find, pairs)
+			return applyStates(cmd, find, pathsFor, pairs)
 		},
 	}
 }
@@ -61,12 +61,15 @@ func withState(names []string, st skills.State) []string {
 
 // applyStates validates every NAME=STATE pair, then links, writes the
 // overrides and prints the list with what changed.
-func applyStates(cmd *cobra.Command, find finder, pairs []string) error {
+func applyStates(cmd *cobra.Command, find finder, pathsFor pathsFinder, pairs []string) error {
 	r, err := find()
 	if err != nil {
 		return err
 	}
-	paths := skills.DefaultPaths()
+	paths, err := pathsFor()
+	if err != nil {
+		return err
+	}
 	before, err := skills.LoadStates(r, paths)
 	if err != nil {
 		return err

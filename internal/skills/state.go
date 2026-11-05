@@ -3,7 +3,9 @@ package skills
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/jorden-parker/skills/internal/settings"
 )
@@ -35,14 +37,54 @@ func ParseState(s string) (State, error) {
 // Linked reports whether the state keeps a link in place.
 func (s State) Linked() bool { return s != Off }
 
+type Scope string
+
+const (
+	GlobalScope  Scope = "global"
+	ProjectScope Scope = "project"
+)
+
+func ParseScope(s string) (Scope, error) {
+	switch Scope(s) {
+	case GlobalScope, ProjectScope:
+		return Scope(s), nil
+	}
+	return "", fmt.Errorf("bad scope: %s (valid: global project)", s)
+}
+
 // Paths are the directories and files the installer reads and writes.
 type Paths struct {
+	Scope         Scope
 	Home          string
 	LinkDir       string // ~/.agents/skills
 	ClaudeDir     string // CLAUDE_CONFIG_DIR or ~/.claude
 	ClaudeLinkDir string // ClaudeDir/skills
 	Settings      string // ClaudeDir/settings.json
 	CodexDir      string // CODEX_HOME or ~/.codex
+}
+
+func PathsFor(scope Scope, dir string) (Paths, error) {
+	if scope != ProjectScope {
+		return DefaultPaths(), nil
+	}
+	top, err := gitTopLevel(dir)
+	if err != nil {
+		return Paths{}, fmt.Errorf("project scope needs a Git repository: %s is not inside a Git repository", dir)
+	}
+	paths := DefaultPaths()
+	paths.Scope = ProjectScope
+	paths.LinkDir = filepath.Join(top, ".agents", "skills")
+	paths.ClaudeLinkDir = filepath.Join(top, ".claude", "skills")
+	paths.Settings = filepath.Join(top, ".claude", "settings.local.json")
+	return paths, nil
+}
+
+func gitTopLevel(dir string) (string, error) {
+	out, err := exec.Command("git", "-C", dir, "rev-parse", "--show-toplevel").Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
 }
 
 // DefaultPaths reads HOME, CLAUDE_CONFIG_DIR and CODEX_HOME.
@@ -60,6 +102,7 @@ func DefaultPaths() Paths {
 		codex = filepath.Join(home, ".codex")
 	}
 	return Paths{
+		Scope:         GlobalScope,
 		Home:          home,
 		LinkDir:       filepath.Join(home, ".agents", "skills"),
 		ClaudeDir:     claude,

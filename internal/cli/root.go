@@ -52,7 +52,18 @@ func handleError(w io.Writer, styles fang.Styles, err error) {
 
 // Root returns the root command. program is the name shown in help.
 func Root(program string) *cobra.Command {
-	var repoFlag string
+	var repoFlag, scopeFlag string
+	pathsFor := func() (skills.Paths, error) {
+		scope, err := skills.ParseScope(scopeFlag)
+		if err != nil {
+			return skills.Paths{}, err
+		}
+		dir, err := os.Getwd()
+		if err != nil {
+			return skills.Paths{}, err
+		}
+		return skills.PathsFor(scope, dir)
+	}
 	root := &cobra.Command{
 		Use:   program,
 		Short: "Tend the skill garden: link skills from this checkout into your agents",
@@ -67,6 +78,8 @@ States: on, off, name-only, user-invocable-only
   off                   Not linked. Hidden everywhere.
   name-only             Linked. Claude sees the name, not the description.
   user-invocable-only   Linked. You can /invoke it; Claude cannot reach for it itself.
+
+Scope: --scope global (default) or --scope project (links in <git root>/.agents/skills and .claude/skills, states in .claude/settings.local.json).
 
 The checkout is found from --repo, then $SKILLS_REPO, then the path baked in
 at build time, then ~/src/skills.
@@ -83,13 +96,20 @@ Adding or removing a skill needs a NEW Claude Code session to take effect.`,
 			if f, ok := cmd.InOrStdin().(*os.File); !ok || !term.IsTerminal(f.Fd()) {
 				return errors.New("not a terminal - use add, remove, set or sync instead")
 			}
-			return tui.Run(r, skills.DefaultPaths())
+			paths, err := pathsFor()
+			if err != nil {
+				return err
+			}
+			return tui.Run(r, paths)
 		},
 	}
 	root.PersistentFlags().StringVarP(&repoFlag, "repo", "C", "", "path to the skills checkout (default: $SKILLS_REPO, the built-in path, or ~/src/skills)")
+	root.PersistentFlags().StringVar(&scopeFlag, "scope", "global", "where links go: global (~/.agents/skills, Claude's skills dir) or project (the current Git project)")
 	find := func() (skills.Repo, error) { return skills.Find(repoFlag) }
-	root.AddCommand(listCmd(find), addCmd(find), removeCmd(find), setCmd(find), syncCmd(find), refreshCmd(find))
+	root.AddCommand(listCmd(find, pathsFor), addCmd(find, pathsFor), removeCmd(find, pathsFor), setCmd(find, pathsFor), syncCmd(find, pathsFor), refreshCmd(find, pathsFor))
 	return root
 }
 
 type finder func() (skills.Repo, error)
+
+type pathsFinder func() (skills.Paths, error)

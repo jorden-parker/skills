@@ -8,7 +8,7 @@ import (
 	"github.com/jorden-parker/skills/internal/skills"
 )
 
-func syncCmd(find finder) *cobra.Command {
+func syncCmd(find finder, pathsFor pathsFinder) *cobra.Command {
 	return &cobra.Command{
 		Use:   "sync",
 		Short: "Repair links to an old checkout and drop links whose skill left the repo",
@@ -21,7 +21,10 @@ skills. No prompts.`,
 			if err != nil {
 				return err
 			}
-			paths := skills.DefaultPaths()
+			paths, err := pathsFor()
+			if err != nil {
+				return err
+			}
 			p := newPrinter(cmd.OutOrStdout())
 			p.blank()
 			p.bold("Syncing links in " + paths.LinkDir + " and " + paths.ClaudeLinkDir)

@@ -6,7 +6,7 @@ import (
 	"github.com/jorden-parker/skills/internal/skills"
 )
 
-func listCmd(find finder) *cobra.Command {
+func listCmd(find finder, pathsFor pathsFinder) *cobra.Command {
 	return &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
@@ -17,7 +17,10 @@ func listCmd(find finder) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			paths := skills.DefaultPaths()
+			paths, err := pathsFor()
+			if err != nil {
+				return err
+			}
 			entries, err := skills.LoadStates(r, paths)
 			if err != nil {
 				return err

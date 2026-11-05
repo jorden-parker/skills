@@ -30,7 +30,7 @@ const (
 )
 
 type keymap struct {
-	toggle, tune, allOn, allOff, review, refresh, reload, help, quit, details, esc key.Binding
+	toggle, tune, allOn, allOff, review, refresh, scope, reload, help, quit, details, esc key.Binding
 }
 
 var keys = keymap{
@@ -40,6 +40,7 @@ var keys = keymap{
 	allOff:  key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "all off")),
 	review:  key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "review & save")),
 	refresh: key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "refresh")),
+	scope:   key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "scope")),
 	reload:  key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "reload")),
 	help:    key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "keys")),
 	quit:    key.NewBinding(key.WithKeys("q", "esc", "ctrl+c"), key.WithHelp("q", "quit")),
@@ -279,7 +280,13 @@ func (m *model) updateGarden(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(k, keys.review):
 			m.mode = modeReview
 			return m, nil
+		case key.Matches(k, keys.scope):
+			return m, m.switchScope()
 		case key.Matches(k, keys.refresh):
+			if m.paths.Scope == skills.ProjectScope {
+				m.setStatus("Refresh works on global installs only. Press p to switch.", true)
+				return m, nil
+			}
 			return m, m.startRefresh(nil)
 		case key.Matches(k, keys.reload):
 			m.reload()
@@ -415,11 +422,36 @@ func (m *model) dialog(title, subtitle, content, help string) string {
 		lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, body))
 }
 
+func (m *model) switchScope() tea.Cmd {
+	if m.pending() > 0 {
+		m.setStatus("Save or discard staged changes before switching scope.", true)
+		return nil
+	}
+	scope := skills.ProjectScope
+	if m.paths.Scope == skills.ProjectScope {
+		scope = skills.GlobalScope
+	}
+	dir, err := os.Getwd()
+	if err != nil {
+		m.setStatus(err.Error(), true)
+		return nil
+	}
+	paths, err := skills.PathsFor(scope, dir)
+	if err != nil {
+		m.setStatus(err.Error(), true)
+		return nil
+	}
+	m.paths = paths
+	m.reload()
+	m.setStatus("Scope: "+string(scope)+" · "+tildify(paths.LinkDir), false)
+	return m.resetList()
+}
+
 func (m *model) header() string {
 	brand := m.st.badge.Render("✿ skills") + " " + m.st.title.Render("The skill garden")
 	count := m.st.subtle.Render(fmt.Sprintf("%d of %d growing · %d pending", m.growing(), len(m.staged), m.pending()))
 	line1 := brand + strings.Repeat(" ", max(1, m.width-lipgloss.Width(brand)-lipgloss.Width(count)-1)) + count
-	line2 := " " + m.st.subtle.Render(tildify(m.repo.SrcDir))
+	line2 := " " + m.st.subtle.Render(tildify(m.repo.SrcDir)+"  ·  "+string(m.paths.Scope)+" "+tildify(m.paths.LinkDir))
 	return short(line1, m.width) + "\n" + short(line2, m.width) + "\n" + m.st.faint.Render(strings.Repeat("─", max(1, m.width)))
 }
 
@@ -463,7 +495,7 @@ func (m *model) hints() []hint {
 	if m.width < 60 {
 		h = append(h, hint{"ctrl+d", "preview"})
 	}
-	return append(h, hint{"a", "all on"}, hint{"n", "all off"}, hint{"R", "reload"})
+	return append(h, hint{"a", "all on"}, hint{"n", "all off"}, hint{"R", "reload"}, hint{"p", "scope"})
 }
 
 func (m *model) footer() string {
@@ -502,7 +534,7 @@ func (m *model) keysOverlay() string {
 	}{
 		{"Move", []hint{{"↑ ↓  j k", "move between skills"}, {"/", "filter by name or description"}, {"pgup pgdn", "scroll the SKILL.md preview"}, {"ctrl+d", "show only the preview (narrow terminals)"}}},
 		{"Stage", []hint{{"space tab", "turn a skill on, or anything else off"}, {"enter t", "tune: pick on, off, name-only or user-invocable-only"}, {"a", "stage every skill on; partial states are kept"}, {"n", "stage every skill off"}}},
-		{"Save", []hint{{"s", "review the staged changes, then save or discard"}, {"R", "reload from disk and drop staged changes"}, {"r", "refresh: replace installed copies with links"}, {"q esc", "quit; asks first when changes are pending"}}},
+		{"Save", []hint{{"s", "review the staged changes, then save or discard"}, {"R", "reload from disk and drop staged changes"}, {"r", "refresh: replace installed copies with links"}, {"p", "switch scope: global or this Git project"}, {"q esc", "quit; asks first when changes are pending"}}},
 	}
 	var b strings.Builder
 	for i, g := range groups {

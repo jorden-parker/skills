@@ -2,6 +2,7 @@ package skills
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -243,5 +244,79 @@ func TestOverridesPreferTheLinkedSibling(t *testing.T) {
 	want := map[string]string{"beta": "name-only", "alpha": "off"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("overrides = %v, want %v", got, want)
+	}
+}
+
+func TestParseScope(t *testing.T) {
+	for _, s := range []string{"global", "project"} {
+		if _, err := ParseScope(s); err != nil {
+			t.Fatalf("ParseScope(%q): %v", s, err)
+		}
+	}
+	if _, err := ParseScope("both"); err == nil || !strings.Contains(err.Error(), "valid: global project") {
+		t.Fatalf("ParseScope(both) = %v", err)
+	}
+}
+
+func TestDefaultPathsAreGlobal(t *testing.T) {
+	if got := DefaultPaths().Scope; got != GlobalScope {
+		t.Fatalf("Scope = %s, want global", got)
+	}
+}
+
+func gitInit(t *testing.T, dir string) {
+	t.Helper()
+	if out, err := exec.Command("git", "init", "-q", dir).CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v\n%s", err, out)
+	}
+}
+
+func TestPathsForProjectUsesGitTopLevel(t *testing.T) {
+	root := t.TempDir()
+	gitInit(t, root)
+	sub := filepath.Join(root, "pkg", "inner")
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	got, err := PathsFor(ProjectScope, sub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	top, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	global := DefaultPaths()
+	if got.Scope != ProjectScope {
+		t.Fatalf("Scope = %s", got.Scope)
+	}
+	if got.LinkDir != filepath.Join(top, ".agents", "skills") {
+		t.Fatalf("LinkDir = %s", got.LinkDir)
+	}
+	if got.ClaudeLinkDir != filepath.Join(top, ".claude", "skills") {
+		t.Fatalf("ClaudeLinkDir = %s", got.ClaudeLinkDir)
+	}
+	if got.Settings != filepath.Join(top, ".claude", "settings.local.json") {
+		t.Fatalf("Settings = %s", got.Settings)
+	}
+	if got.Home != global.Home || got.ClaudeDir != global.ClaudeDir || got.CodexDir != global.CodexDir {
+		t.Fatalf("Home, ClaudeDir and CodexDir should match the global paths: %+v", got)
+	}
+}
+
+func TestPathsForProjectOutsideRepoFails(t *testing.T) {
+	_, err := PathsFor(ProjectScope, t.TempDir())
+	if err == nil || !strings.Contains(err.Error(), "not inside a Git repository") {
+		t.Fatalf("PathsFor outside a repo = %v", err)
+	}
+}
+
+func TestPathsForGlobalIgnoresDirectory(t *testing.T) {
+	got, err := PathsFor(GlobalScope, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got, DefaultPaths()) {
+		t.Fatalf("PathsFor(global) = %+v, want %+v", got, DefaultPaths())
 	}
 }

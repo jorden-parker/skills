@@ -83,9 +83,13 @@ func (h *harness) ok(args ...string) string {
 }
 
 func (h *harness) states() map[string]string {
+	return h.statesFor("list")
+}
+
+func (h *harness) statesFor(args ...string) map[string]string {
 	h.t.Helper()
 	found := map[string]string{}
-	for _, line := range strings.Split(h.ok("list"), "\n") {
+	for _, line := range strings.Split(h.ok(args...), "\n") {
 		for _, name := range []string{"alpha", "beta"} {
 			if !strings.Contains(line+" ", " me/"+name+" ") {
 				continue
@@ -527,6 +531,92 @@ func TestRefreshMatchingCopyAndOutdatedLinkInCustomRoots(t *testing.T) {
 	_, errOut, code = h.run("refresh", "unknown", "example", "zzz")
 	if code != 2 || errOut != "error: no such skill: unknown\nerror: no such skill: zzz\n" {
 		t.Fatalf("exit %d, stderr %q", code, errOut)
+	}
+}
+
+func (h *harness) chdirToNewProject() string {
+	h.t.Helper()
+	dir := filepath.Join(h.base, "project")
+	if out, err := exec.Command("git", "init", "-q", dir).CombinedOutput(); err != nil {
+		h.t.Fatalf("git init: %v\n%s", err, out)
+	}
+	h.t.Chdir(dir)
+	return dir
+}
+
+func TestProjectScopeLinksIntoTheGitProject(t *testing.T) {
+	h := newHarness(t)
+	project := h.chdirToNewProject()
+	h.ok("add", "alpha", "--scope", "project")
+	want := filepath.Join(h.repo, "catalog", "me", "alpha")
+	for _, dir := range []string{filepath.Join(project, ".agents", "skills"), filepath.Join(project, ".claude", "skills")} {
+		if !isLink(filepath.Join(dir, "alpha")) {
+			t.Fatalf("%s/alpha not linked", dir)
+		}
+		resolves(t, filepath.Join(dir, "alpha"), want)
+	}
+	if isLink(filepath.Join(h.links, "alpha")) || isLink(filepath.Join(h.claudeLinks, "alpha")) {
+		t.Fatal("project scope linked into the global directories")
+	}
+}
+
+func TestProjectScopeSetWritesLocalSettings(t *testing.T) {
+	h := newHarness(t)
+	project := h.chdirToNewProject()
+	h.ok("set", "alpha=name-only", "--scope", "project")
+	b, err := os.ReadFile(filepath.Join(project, ".claude", "settings.local.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc struct {
+		Overrides map[string]string `json:"skillOverrides"`
+	}
+	if err := json.Unmarshal(b, &doc); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(doc.Overrides, map[string]string{"alpha": "name-only"}) {
+		t.Fatalf("project overrides = %v", doc.Overrides)
+	}
+	if _, err := os.Stat(h.settings); !os.IsNotExist(err) {
+		t.Fatal("global settings.json was written")
+	}
+}
+
+func TestProjectScopeStatesAreSeparateFromGlobal(t *testing.T) {
+	h := newHarness(t)
+	h.chdirToNewProject()
+	h.ok("set", "alpha=name-only", "--scope", "project")
+	if got := h.statesFor("list", "--scope", "project"); !reflect.DeepEqual(got, map[string]string{"alpha": "name-only", "beta": "off"}) {
+		t.Fatalf("project states = %v", got)
+	}
+	if got := h.states(); !reflect.DeepEqual(got, map[string]string{"alpha": "off", "beta": "off"}) {
+		t.Fatalf("global states = %v", got)
+	}
+}
+
+func TestBadScopeIsRejected(t *testing.T) {
+	h := newHarness(t)
+	_, errOut, code := h.run("--scope", "nope", "list")
+	if code == 0 || !strings.Contains(errOut, "bad scope: nope") {
+		t.Fatalf("exit %d, stderr:\n%s", code, errOut)
+	}
+}
+
+func TestRefreshIsGlobalOnly(t *testing.T) {
+	h := newHarness(t)
+	h.chdirToNewProject()
+	_, errOut, code := h.run("refresh", "--scope", "project")
+	if code == 0 || !strings.Contains(errOut, "refresh works on global installs only") {
+		t.Fatalf("exit %d, stderr:\n%s", code, errOut)
+	}
+}
+
+func TestProjectScopeOutsideGitFails(t *testing.T) {
+	h := newHarness(t)
+	t.Chdir(t.TempDir())
+	_, errOut, code := h.run("list", "--scope", "project")
+	if code == 0 || !strings.Contains(errOut, "not inside a Git repository") {
+		t.Fatalf("exit %d, stderr:\n%s", code, errOut)
 	}
 }
 

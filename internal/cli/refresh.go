@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
@@ -10,7 +11,7 @@ import (
 	"github.com/jorden-parker/skills/internal/skills"
 )
 
-func refreshCmd(find finder) *cobra.Command {
+func refreshCmd(find finder, pathsFor pathsFinder) *cobra.Command {
 	var check bool
 	c := &cobra.Command{
 		Use:   "refresh [NAME...]",
@@ -28,6 +29,13 @@ untouched and reported for review.`,
 			r, err := find()
 			if err != nil {
 				return err
+			}
+			paths, err := pathsFor()
+			if err != nil {
+				return err
+			}
+			if paths.Scope == skills.ProjectScope {
+				return errors.New("refresh works on global installs only; drop --scope project")
 			}
 			ids, ok := resolveAll(r, args, cmd.ErrOrStderr())
 			if !ok {

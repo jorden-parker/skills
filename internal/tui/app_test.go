@@ -208,6 +208,79 @@ func TestStageThenSavePreservesPartialStates(t *testing.T) {
 	}
 }
 
+func (f *fixture) chdirToNewProject() string {
+	f.t.Helper()
+	dir := filepath.Join(f.base, "project")
+	if out, err := exec.Command("git", "init", "-q", dir).CombinedOutput(); err != nil {
+		f.t.Fatalf("git init: %v\n%s", err, out)
+	}
+	f.t.Chdir(dir)
+	resolved, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	return resolved
+}
+
+func TestScopeKeyLinksIntoTheGitProject(t *testing.T) {
+	f := newFixture(t)
+	project := f.chdirToNewProject()
+	m := f.open()
+	press(m, "p")
+	if m.paths.Scope != skills.ProjectScope || !strings.HasPrefix(m.paths.LinkDir, project) {
+		t.Fatalf("paths = %+v", m.paths)
+	}
+	selectSkill(t, m, "me/alpha")
+	press(m, "space", "s", "enter")
+	if !isLink(filepath.Join(project, ".agents", "skills", "alpha")) {
+		t.Fatal("alpha not linked in the project")
+	}
+	if isLink(filepath.Join(f.paths.LinkDir, "alpha")) {
+		t.Fatal("alpha linked globally")
+	}
+	press(m, "p")
+	if m.paths.Scope != skills.GlobalScope {
+		t.Fatalf("scope = %s, want global", m.paths.Scope)
+	}
+	if stagedStates(m)["me/alpha"] != skills.Off {
+		t.Fatalf("global alpha = %v, want off", stagedStates(m)["me/alpha"])
+	}
+}
+
+func TestScopeKeyWaitsForStagedChanges(t *testing.T) {
+	f := newFixture(t)
+	f.chdirToNewProject()
+	m := f.open()
+	selectSkill(t, m, "me/alpha")
+	press(m, "space", "p")
+	if m.paths.Scope != skills.GlobalScope {
+		t.Fatal("scope changed with changes staged")
+	}
+	if !strings.Contains(m.status, "Save or discard") {
+		t.Fatalf("status = %q", m.status)
+	}
+}
+
+func TestRefreshDoesNotRunInProjectScope(t *testing.T) {
+	f := newFixture(t)
+	f.chdirToNewProject()
+	m := f.open()
+	press(m, "p", "r")
+	if m.mode != modeGarden || !strings.Contains(m.status, "global") {
+		t.Fatalf("mode %v status %q", m.mode, m.status)
+	}
+}
+
+func TestScopeKeyOutsideGitStaysGlobal(t *testing.T) {
+	f := newFixture(t)
+	t.Chdir(t.TempDir())
+	m := f.open()
+	press(m, "p")
+	if m.paths.Scope != skills.GlobalScope || !m.statusErr || !strings.Contains(m.status, "not inside a Git repository") {
+		t.Fatalf("scope %s status %q", m.paths.Scope, m.status)
+	}
+}
+
 func TestCanStartWithNoEnabledSkills(t *testing.T) {
 	f := newFixture(t)
 	m := f.open()
