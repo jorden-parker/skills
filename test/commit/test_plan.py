@@ -5,9 +5,7 @@ import subprocess
 import tempfile
 import unittest
 
-SKILL_DIRECTORY = Path(__file__).resolve().parents[2] / "skills" / "jorden" / "commit"
-PLAN = SKILL_DIRECTORY / "plan"
-RENDER = SKILL_DIRECTORY / "render"
+PLAN = Path(__file__).resolve().parents[2] / "skills" / "jorden" / "commit" / "plan"
 
 
 class PlanTestCase(unittest.TestCase):
@@ -25,6 +23,7 @@ class PlanTestCase(unittest.TestCase):
         self.head = self.git("rev-parse", "HEAD").strip()
         self.git_dir = Path(self.git("rev-parse", "--absolute-git-dir").strip())
         self.skills_tmpdir = Path(temporary.name, "skills-tmp")
+        (self.repo / "a.txt").write_text("a\n", encoding="utf-8")
 
     def git(self, *arguments):
         result = subprocess.run(["git", *arguments], cwd=self.repo, capture_output=True, text=True, check=False)
@@ -32,78 +31,68 @@ class PlanTestCase(unittest.TestCase):
             raise AssertionError(result.stderr)
         return result.stdout
 
-    def run_tool(self, tool, *arguments):
+    def plan(self, *arguments, document=None):
         environment = {**os.environ, "SKILLS_TMPDIR": str(self.skills_tmpdir)}
-        return subprocess.run([str(tool), *arguments], cwd=self.repo, capture_output=True, text=True, check=False, env=environment)
+        stdin = json.dumps(document) if document is not None else ""
+        return subprocess.run([str(PLAN), *arguments], cwd=self.repo, input=stdin, capture_output=True, text=True, check=False, env=environment)
 
-    def plan(self, *arguments):
-        return self.run_tool(PLAN, *arguments)
+    def build(self, document):
+        result = self.plan("build", document=document)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        page = Path(result.stdout.strip())
+        return page, json.loads((page.parent / "plan.json").read_text(encoding="utf-8"))
 
-    @property
-    def plan_file(self):
-        return Path(self.plan("dir").stdout.strip(), "plan.json")
-
-    def saved(self):
-        return json.loads(self.plan_file.read_text(encoding="utf-8"))
+    def one_commit(self, **extra):
+        return {"commits": [{"header": "feat: add a", "why": "new file", "paths": ["a.txt"]}], **extra}
 
     def test_plan_lives_outside_the_git_dir(self):
         before = sorted(str(path) for path in self.git_dir.rglob("*"))
-        result = self.plan("new")
-        self.assertEqual(result.returncode, 0, result.stderr)
-        directory = self.plan("dir").stdout.strip()
-        self.assertEqual(result.stdout.strip(), directory + "/plan.json")
-        self.assertTrue(directory.startswith(str(self.skills_tmpdir / "commit") + "/"))
+        page, _ = self.build(self.one_commit())
+        self.assertEqual(page.name, "index.html")
+        self.assertTrue(str(page).startswith(str(self.skills_tmpdir.resolve() / "commit") + "/"))
         self.assertEqual(sorted(str(path) for path in self.git_dir.rglob("*")), before)
         self.assertEqual((self.skills_tmpdir / "commit").stat().st_mode & 0o777, 0o700)
 
-    def test_new_records_head_and_empty_commits(self):
-        result = self.plan("new")
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout.strip(), str(self.plan_file))
-        self.assertEqual(self.saved(), {"base": self.head, "commits": []})
-
-    def test_commit_splits_header(self):
-        self.plan("new")
-        result = self.plan("commit", "feat(cli)!: add x", "--why", "w", "a.txt")
-        self.assertEqual(result.returncode, 0, result.stderr)
-        commit = self.saved()["commits"][0]
+    def test_build_records_head_and_splits_header(self):
+        document = {"commits": [{"header": "feat(cli)!: add x", "why": "w", "paths": ["a.txt"]}]}
+        _, saved = self.build(document)
+        self.assertEqual(saved["base"], self.head)
+        commit = saved["commits"][0]
         self.assertEqual(
-            (commit["type"], commit["scope"], commit["breaking"], commit["subject"], commit["paths"]),
-            ("feat", "cli", True, "add x", ["a.txt"]),
+            (commit["type"], commit["scope"], commit["breaking"], commit["subject"], commit["paths"], commit["rationale"]),
+            ("feat", "cli", True, "add x", ["a.txt"], "w"),
         )
 
     def test_bad_header_is_rejected_and_plan_unchanged(self):
-        self.plan("new")
-        before = self.plan_file.read_text(encoding="utf-8")
-        result = self.plan("commit", "Add x", "--why", "w", "a.txt")
+        page, _ = self.build(self.one_commit())
+        before = (page.parent / "plan.json").read_text(encoding="utf-8")
+        result = self.plan("build", document={"commits": [{"header": "Add x", "why": "w", "paths": ["a.txt"]}]})
         self.assertEqual(result.returncode, 1)
-        self.assertEqual(self.plan_file.read_text(encoding="utf-8"), before)
+        self.assertIn("header must look like", result.stderr)
+        self.assertEqual((page.parent / "plan.json").read_text(encoding="utf-8"), before)
 
-    def test_missing_plan_asks_for_new(self):
-        result = self.plan("commit", "feat: x", "--why", "w", "a.txt")
+    def test_build_needs_commits(self):
+        result = self.plan("build", document={"commits": []})
         self.assertEqual(result.returncode, 1)
-        self.assertIn("plan new", result.stderr)
+        self.assertIn("non-empty commits list", result.stderr)
 
-    def test_ignore_calls_build_one_block(self):
-        self.plan("new")
-        self.plan("ignore", "dist/", "--reason", "build output")
-        self.plan("ignore", ".env.local", "--reason", "secrets", "--subject", "ignore local files", "--untrack", "old.log")
-        ignore = self.saved()["ignore"]
-        self.assertEqual(ignore["patterns"], ["dist/", ".env.local"])
-        self.assertEqual(ignore["reasons"], {"dist/": "build output", ".env.local": "secrets"})
-        self.assertEqual(ignore["untrack"], ["old.log"])
+    def test_commit_needs_paths_or_patch(self):
+        result = self.plan("build", document={"commits": [{"header": "feat: x", "why": "w"}]})
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("commit 1 needs paths or patch", result.stderr)
 
-    def test_exclude_appends(self):
-        self.plan("new")
-        self.plan("exclude", "secret.txt", "--reason", "looks like a secret")
-        self.assertEqual(self.saved()["excluded"], [{"path": "secret.txt", "reason": "looks like a secret"}])
+    def test_ignore_and_excluded_are_saved(self):
+        (self.repo / "secret.txt").write_text("token\n", encoding="utf-8")
+        ignore = {"patterns": {"dist/": "build output"}, "untrack": []}
+        excluded = [{"path": "secret.txt", "reason": "looks like a secret"}]
+        _, saved = self.build(self.one_commit(ignore=ignore, excluded=excluded))
+        self.assertEqual(saved["ignore"], {"subject": "ignore local files", "patterns": ["dist/"], "reasons": {"dist/": "build output"}, "untrack": []})
+        self.assertEqual(saved["excluded"], excluded)
 
-    def test_plan_renders(self):
-        (self.repo / "a.txt").write_text("a\n", encoding="utf-8")
-        self.plan("new")
-        self.plan("commit", "feat: add a", "--why", "new file", "a.txt")
-        result = self.run_tool(RENDER, str(self.plan_file))
+    def test_gather_shows_untracked_contents(self):
+        result = self.plan("gather")
         self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("### a.txt\na\n", result.stdout)
 
 
 if __name__ == "__main__":

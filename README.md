@@ -96,13 +96,14 @@ It needs Python 3 and the same one-time `pnpm install`.
 
 ## Skills
 
-| Skill                                         | What it does                                                                                    |
-| --------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| [`pr-draft`](skills/jorden/pr-draft/)         | Opens a draft PR for the current branch, or updates the existing one. `/`-invoked only.         |
-| [`geist`](skills/jorden/geist/)               | Vercel's Geist Design System — real tokens, type scale, component recipes.                      |
-| [`new-project`](skills/jorden/new-project/)   | Initialises tooling in an existing project or scaffolds a new one, inferred from the directory. |
-| [`web-research`](skills/jorden/web-research/) | Researches a question on the live web and shows the findings as a cited page. `/`-invoked only. |
-| [`commit`](skills/jorden/commit/)             | Sorts changes into Conventional Commits as copyable commands on a local page. `/`-invoked only. |
+| Skill                                         | What it does                                                                                                    |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| [`pr-draft`](skills/jorden/pr-draft/)         | Opens a draft PR for the current branch, or updates the existing one. `/`-invoked only.                         |
+| [`geist`](skills/jorden/geist/)               | Vercel's Geist Design System — real tokens, type scale, component recipes.                                      |
+| [`new-project`](skills/jorden/new-project/)   | Initialises tooling in an existing project or scaffolds a new one, inferred from the directory.                 |
+| [`web-research`](skills/jorden/web-research/) | Researches a question on the live web and shows the findings as a cited page. `/`-invoked only.                 |
+| [`commit`](skills/jorden/commit/)             | Sorts changes into Conventional Commits as copyable commands on a local page. `/`-invoked only.                 |
+| [`handoff`](skills/jorden/handoff/)           | Compacts the conversation into a handoff document for the next agent. Same name as Matt’s; one is on at a time. |
 
 ### Upstream skills
 
@@ -144,4 +145,4 @@ docs/adr/                decisions worth remembering
 - Nothing here writes to a global or user-level `CLAUDE.md`. The `geist` skill will offer to add one line to a _project's_ `CLAUDE.md`, and asks first.
 - The pre-commit hook runs lint-staged (Prettier, gofmt), then `go build`, `go vet` and `go test`.
 - Commit messages are Conventional Commits. The `commit-msg` hook runs `commitlint` and rejects anything else, so `Add a thing` fails and `feat: add a thing` passes.
-- No Claude Code or Anthropic attribution is added to commits or pull requests.
+- The `commit` and `pr-draft` skills add no Claude Code or Anthropic attribution to the commits and pull requests they draft.
