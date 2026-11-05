@@ -26,6 +26,18 @@ _Avoid_: alias, slug
 The symlink from a machine's `~/.agents/skills/<link name>` back into the Catalog. A skill is _installed_ when its Link exists and points at it rather than at a same-name sibling.
 _Avoid_: install, copy, deploy
 
+**Registry**:
+skills.sh, the public index of skills published from GitHub repos. The garden lists every skill its sitemaps publish.
+_Avoid_: marketplace, store, remote
+
+**Registry ID**:
+A registry skill's ID, `owner/repo/skill`. Three segments, so it never clashes with a Catalog ID.
+_Avoid_: slug, package
+
+**Download cache**:
+`${XDG_DATA_HOME:-~/.local/share}/skills/registry/`, where registry skills are written before they are linked. Shared by both Scopes; turning a skill off keeps its files.
+_Avoid_: vendor, install dir
+
 **State**:
 How visible an installed skill is on a machine: `on`, `off`, `name-only`, or `user-invocable-only`. A skill can be linked and still be off.
 _Avoid_: enabled, disabled, active

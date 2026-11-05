@@ -23,6 +23,7 @@ skills                        # open the garden: pick which skills are on
 skills list                   # show current state
 skills add geist              # link a skill
 skills add geist --scope project   # link into the current Git project only
+skills add vercel-labs/skills/find-skills   # download from skills.sh and link it
 skills remove geist           # remove its links
 skills set geist name-only    # set a partial state directly (also NAME=STATE)
 skills sync                   # repair stale links, drop links to removed skills, no prompts
@@ -64,22 +65,31 @@ Links point into `<checkout>/catalog/<author>/<name>`, so the command needs to k
 
 `skills` with no arguments opens the garden, a terminal UI built on Charm’s Bubble Tea and Lip Gloss. The left pane lists every skill with its state; the right pane previews the selected `SKILL.md`. Nothing changes on disk until you save.
 
-| Key             | Does                                                                                                      |
-| --------------- | --------------------------------------------------------------------------------------------------------- |
-| `↑` `↓` `j` `k` | Move between skills                                                                                       |
-| `space` `tab`   | Turn an off skill on, or anything else off. Partial states stay as they are until toggled off             |
-| `enter` `t`     | Tune: pick `on`, `off`, `name-only` or `user-invocable-only`                                              |
-| `a` / `n`       | Stage every skill on (partial states kept) / every skill off                                              |
-| `s`             | Review the staged changes, then `enter` saves, `d` discards, `esc` returns                                |
-| `r`             | Refresh: show which installed copies would be replaced; `enter` applies, `f` scopes to the selected skill |
-| `R`             | Reload from disk and drop staged changes                                                                  |
-| `p`             | Switch scope: global, or the current Git project (only when nothing is staged)                            |
-| `/`             | Filter by name or description                                                                             |
-| `ctrl+d`        | Show only the preview in a narrow terminal                                                                |
-| `?`             | Key reference                                                                                             |
-| `q` `esc`       | Quit; asks first when changes are pending                                                                 |
+| Key             | Does                                                                                                           |
+| --------------- | -------------------------------------------------------------------------------------------------------------- |
+| `↑` `↓` `j` `k` | Move between skills                                                                                            |
+| `space` `tab`   | Turn an off skill on, or anything else off. Partial states stay as they are until toggled off                  |
+| `enter` `t`     | Tune: pick `on`, `off`, `name-only` or `user-invocable-only`                                                   |
+| `a` / `n`       | Stage every skill on (partial states kept) / every skill off                                                   |
+| `s`             | Review the staged changes, then `enter` saves, `d` discards, `esc` returns                                     |
+| `r`             | Refresh: show which installed copies would be replaced; `enter` applies, `f` scopes to the selected skill      |
+| `R`             | Reload from disk and drop staged changes                                                                       |
+| `p`             | Switch scope: global, or the current Git project (only when nothing is staged)                                 |
+| `b`             | Browse every skill on skills.sh, or go back to the catalog; `space` and `s` install one like any catalog skill |
+| `/`             | Filter by name or description                                                                                  |
+| `ctrl+d`        | Show only the preview in a narrow terminal                                                                     |
+| `?`             | Key reference                                                                                                  |
+| `q` `esc`       | Quit; asks first when changes are pending                                                                      |
 
 Saving writes the links and `settings.json`, keeps a `.bak` of the previous settings, and reminds you that a new Claude Code session is needed.
+
+### Skills from skills.sh
+
+`skills add owner/repo/skill` and the garden's `b` key reach every skill published on [skills.sh](https://www.skills.sh). `b` lists them, and `space` and `s` install one like any catalog skill. A registry skill is downloaded into `${XDG_DATA_HOME:-~/.local/share}/skills/registry/<owner>/<repo>/<skill>/` and then linked. The list of IDs comes from skills.sh's sitemaps and is cached for a day at `${XDG_CACHE_HOME:-~/.cache}/skills/skills-sh-index.txt`.
+
+Downloads are not updated automatically. To fetch a newer copy, delete the skill's folder, then turn the skill off and on again. Downloaded files lose their execute bits. `SKILLS_REGISTRY_URL` overrides the skills.sh base URL, for tests.
+
+Registry skills are third-party instructions and scripts, so read the preview before turning one on.
 
 ### PR description preview
 
