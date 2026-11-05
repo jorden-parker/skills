@@ -33,12 +33,28 @@ type Client struct {
 }
 
 func New(p skills.Paths) Client {
+	baseURL := os.Getenv("SKILLS_REGISTRY_URL")
+	if baseURL == "" {
+		baseURL = "https://www.skills.sh"
+	}
 	return Client{
-		BaseURL:   "https://www.skills.sh",
+		BaseURL:   baseURL,
 		IndexPath: p.RegistryIndex,
 		HTTP:      &http.Client{Timeout: 30 * time.Second},
 		Now:       time.Now,
 	}
+}
+
+func FetchMissing(c Client, r skills.Repo, entries []skills.Entry) error {
+	for _, entry := range entries {
+		if !entry.State.Linked() || !skills.IsRegistryID(entry.Name) || r.Has(entry.Name) {
+			continue
+		}
+		if err := c.Download(entry.Name, r.Source(entry.Name)); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (c Client) Index() ([]string, error) {

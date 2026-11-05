@@ -194,6 +194,15 @@ func ResolvesTo(path, source string) bool {
 	return err == nil && got == want
 }
 
+func EnsureEntry(entries []Entry, id string) []Entry {
+	for _, entry := range entries {
+		if entry.Name == id {
+			return entries
+		}
+	}
+	return append(entries, Entry{Name: id, State: Off})
+}
+
 // Stage sets the state of the entry with this ID. A linked state turns off
 // every other entry with the same link name, so one skill per name is on.
 func Stage(entries []Entry, id string, st State) {

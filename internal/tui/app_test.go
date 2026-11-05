@@ -41,6 +41,7 @@ func newFixture(t *testing.T) *fixture {
 	t.Setenv("CODEX_HOME", filepath.Join(base, "codex"))
 	t.Setenv("XDG_DATA_HOME", "")
 	t.Setenv("XDG_CACHE_HOME", "")
+	t.Setenv("SKILLS_REGISTRY_URL", "http://127.0.0.1:1")
 	return &fixture{t: t, base: base, repo: r, paths: skills.DefaultPaths()}
 }
 

@@ -3,6 +3,8 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -31,6 +33,7 @@ func newHarness(t *testing.T) *harness {
 	t.Setenv("CODEX_HOME", filepath.Join(base, "codex"))
 	t.Setenv("XDG_DATA_HOME", "")
 	t.Setenv("XDG_CACHE_HOME", "")
+	t.Setenv("SKILLS_REGISTRY_URL", "http://127.0.0.1:1")
 	t.Setenv("SKILLS_REPO", "")
 	t.Setenv("NO_COLOR", "1")
 	h.links = filepath.Join(base, "home", ".agents", "skills")
@@ -660,4 +663,81 @@ func TestSyncRelinksFlatLinksIntoAuthorFolders(t *testing.T) {
 	if got := h.states(); got["alpha"] != "on" || got["beta"] != "off" {
 		t.Fatalf("states = %v", got)
 	}
+}
+
+const registrySkillBody = "---\nname: lint\ndescription: lint skill\n---\n"
+
+func newRegistryServer(t *testing.T) {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/download/acme/tools/lint" {
+			http.NotFound(w, r)
+			return
+		}
+		files := []map[string]string{{"path": "SKILL.md", "contents": registrySkillBody}}
+		_ = json.NewEncoder(w).Encode(map[string]any{"files": files, "hash": "abc"})
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("SKILLS_REGISTRY_URL", server.URL)
+}
+
+func registryDir(h *harness) string {
+	return filepath.Join(h.base, "home", ".local", "share", "skills", "registry", "acme", "tools", "lint")
+}
+
+func TestAddDownloadsRegistrySkillThenLinksIt(t *testing.T) {
+	h := newHarness(t)
+	newRegistryServer(t)
+	out := h.ok("add", "acme/tools/lint")
+	if got, err := os.ReadFile(filepath.Join(registryDir(h), "SKILL.md")); err != nil || string(got) != registrySkillBody {
+		t.Fatalf("download = %q, %v", got, err)
+	}
+	for _, dir := range []string{h.links, h.claudeLinks} {
+		resolves(t, filepath.Join(dir, "lint"), registryDir(h))
+	}
+	if !strings.Contains(out, "acme/tools/lint off") || !strings.Contains(out, "-> on") {
+		t.Fatalf("add:\n%s", out)
+	}
+	if list := h.ok("list"); !strings.Contains(list, "acme/tools/lint") || !strings.Contains(list, "on") {
+		t.Fatalf("list:\n%s", list)
+	}
+}
+
+func TestRemoveKeepsDownloadedRegistrySkill(t *testing.T) {
+	h := newHarness(t)
+	newRegistryServer(t)
+	h.ok("add", "acme/tools/lint")
+	h.ok("remove", "acme/tools/lint")
+	if isLink(filepath.Join(h.links, "lint")) || isLink(filepath.Join(h.claudeLinks, "lint")) {
+		t.Fatal("lint still linked")
+	}
+	if _, err := os.Stat(filepath.Join(registryDir(h), "SKILL.md")); err != nil {
+		t.Fatalf("download removed: %v", err)
+	}
+}
+
+func TestAddMissingRegistrySkillFailsWithoutLinking(t *testing.T) {
+	h := newHarness(t)
+	newRegistryServer(t)
+	_, errOut, code := h.run("add", "acme/tools/missing")
+	if code == 0 || !strings.Contains(errOut, "not found on skills.sh") {
+		t.Fatalf("exit %d, stderr:\n%s", code, errOut)
+	}
+	if isLink(filepath.Join(h.links, "missing")) {
+		t.Fatal("missing skill was linked")
+	}
+}
+
+func TestSyncRelinksDownloadedRegistrySkill(t *testing.T) {
+	h := newHarness(t)
+	newRegistryServer(t)
+	h.ok("add", "acme/tools/lint")
+	if err := os.Remove(filepath.Join(h.claudeLinks, "lint")); err != nil {
+		t.Fatal(err)
+	}
+	out := h.ok("sync")
+	if !strings.Contains(out, "synced acme/tools/lint") || strings.Contains(out, "removed") {
+		t.Fatalf("sync:\n%s", out)
+	}
+	resolves(t, filepath.Join(h.claudeLinks, "lint"), registryDir(h))
 }

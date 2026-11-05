@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/jorden-parker/skills/internal/links"
+	"github.com/jorden-parker/skills/internal/registry"
 	"github.com/jorden-parker/skills/internal/settings"
 	"github.com/jorden-parker/skills/internal/skills"
 )
@@ -88,6 +89,8 @@ func applyStates(cmd *cobra.Command, find finder, pathsFor pathsFinder, pairs []
 		if err != nil {
 			return err
 		}
+		before = skills.EnsureEntry(before, id)
+		staged = skills.EnsureEntry(staged, id)
 		skills.Stage(staged, id, st)
 	}
 	p := newPrinter(cmd.OutOrStdout())
@@ -103,6 +106,9 @@ func applyStates(cmd *cobra.Command, find finder, pathsFor pathsFinder, pairs []
 
 // save applies the staged states to the filesystem and settings.json.
 func save(r skills.Repo, paths skills.Paths, staged []skills.Entry, warn links.Warn) ([]skills.Entry, error) {
+	if err := registry.FetchMissing(registry.New(paths), r, staged); err != nil {
+		return nil, err
+	}
 	after, err := links.Apply(r, paths, staged, warn)
 	if err != nil {
 		return nil, err
