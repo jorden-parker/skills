@@ -415,6 +415,20 @@ func TestDownloadedListsOnlySkillsWithManifest(t *testing.T) {
 	}
 }
 
+func TestDownloadedIgnoresDotStagingDirectories(t *testing.T) {
+	r := newRepo(t)
+	writeRegistrySkill(t, r, "acme/tools/lint")
+	writeRegistrySkill(t, r, "acme/.download-123/lint")
+	writeRegistrySkill(t, r, ".hidden/tools/lint")
+	got, err := r.Downloaded()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"acme/tools/lint"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("Downloaded = %v, want %v", got, want)
+	}
+}
+
 func TestRegistrySkillDescribeAndManifest(t *testing.T) {
 	r := newRepo(t)
 	writeRegistrySkill(t, r, "acme/tools/lint")

@@ -107,7 +107,9 @@ func (r Repo) Downloaded() ([]string, error) {
 	}
 	var ids []string
 	for _, owner := range owners {
-		ids = append(ids, r.downloadedUnder(owner.Name())...)
+		if !strings.HasPrefix(owner.Name(), ".") {
+			ids = append(ids, r.downloadedUnder(owner.Name())...)
+		}
 	}
 	sort.Strings(ids)
 	return ids, nil
@@ -117,8 +119,14 @@ func (r Repo) downloadedUnder(owner string) []string {
 	var ids []string
 	repos, _ := os.ReadDir(filepath.Join(r.RegistryDir, owner))
 	for _, repoDir := range repos {
+		if strings.HasPrefix(repoDir.Name(), ".") {
+			continue
+		}
 		skillDirs, _ := os.ReadDir(filepath.Join(r.RegistryDir, owner, repoDir.Name()))
 		for _, skillDir := range skillDirs {
+			if strings.HasPrefix(skillDir.Name(), ".") {
+				continue
+			}
 			if id := path.Join(owner, repoDir.Name(), skillDir.Name()); r.Has(id) {
 				ids = append(ids, id)
 			}
