@@ -1,7 +1,9 @@
 package registry
 
 import (
+	"encoding/json"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -121,16 +123,123 @@ func urlsetIDs(body []byte) ([]string, error) {
 	return ids, nil
 }
 
+var errNotFound = errors.New("not found on skills.sh")
+
 func (c Client) get(requestPath string) ([]byte, error) {
 	resp, err := c.HTTP.Get(c.BaseURL + requestPath)
 	if err != nil {
 		return nil, fmt.Errorf("skills.sh: GET %s: %w", requestPath, err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("skills.sh: GET %s: %s", requestPath, resp.Status)
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
+	case http.StatusNotFound:
+		return nil, fmt.Errorf("skills.sh: GET %s: %w", requestPath, errNotFound)
 	}
-	return io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
+	return nil, fmt.Errorf("skills.sh: GET %s: %s", requestPath, resp.Status)
+}
+
+type File struct {
+	Path     string `json:"path"`
+	Contents string `json:"contents"`
+}
+
+func (c Client) Files(id string) ([]File, error) {
+	if !skills.IsRegistryID(id) {
+		return nil, fmt.Errorf("not a skills.sh ID: %s", id)
+	}
+	body, err := c.get("/api/download/" + escapedSegments(id))
+	if err != nil {
+		return nil, err
+	}
+	var download struct {
+		Files []File `json:"files"`
+	}
+	if err := json.Unmarshal(body, &download); err != nil {
+		return nil, fmt.Errorf("skills.sh: download %s: %w", id, err)
+	}
+	return download.Files, nil
+}
+
+func escapedSegments(id string) string {
+	segments := strings.Split(id, "/")
+	for i, segment := range segments {
+		segments[i] = url.PathEscape(segment)
+	}
+	return strings.Join(segments, "/")
+}
+
+func (c Client) Manifest(id string) (string, error) {
+	files, err := c.Files(id)
+	if err != nil {
+		return "", err
+	}
+	for _, file := range files {
+		if file.Path == "SKILL.md" {
+			return file.Contents, nil
+		}
+	}
+	return "", fmt.Errorf("skills.sh: %s has no SKILL.md", id)
+}
+
+func (c Client) Download(id, dest string) error {
+	files, err := c.Files(id)
+	if err != nil {
+		return err
+	}
+	if err := checkFiles(id, files); err != nil {
+		return err
+	}
+	parent := filepath.Dir(dest)
+	if err := os.MkdirAll(parent, 0o755); err != nil {
+		return err
+	}
+	staging, err := os.MkdirTemp(parent, ".download-*")
+	if err != nil {
+		return err
+	}
+	err = writeFiles(staging, files)
+	if err == nil {
+		err = os.RemoveAll(dest)
+	}
+	if err == nil {
+		err = os.Rename(staging, dest)
+	}
+	if err != nil {
+		_ = os.RemoveAll(staging)
+	}
+	return err
+}
+
+func checkFiles(id string, files []File) error {
+	hasManifest := false
+	for _, file := range files {
+		if !filepath.IsLocal(filepath.FromSlash(file.Path)) {
+			return fmt.Errorf("skills.sh: %s has an unsafe file path %q", id, file.Path)
+		}
+		hasManifest = hasManifest || file.Path == "SKILL.md"
+	}
+	if !hasManifest {
+		return fmt.Errorf("skills.sh: %s has no SKILL.md", id)
+	}
+	return nil
+}
+
+func writeFiles(root string, files []File) error {
+	if err := os.Chmod(root, 0o755); err != nil {
+		return err
+	}
+	for _, file := range files {
+		target := filepath.Join(root, filepath.FromSlash(file.Path))
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(target, []byte(file.Contents), 0o644); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func readIndexFile(indexPath string) ([]string, error) {
