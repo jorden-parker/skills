@@ -15,6 +15,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/jorden-parker/skills/internal/registry"
 	"github.com/jorden-parker/skills/internal/skills"
 )
 
@@ -30,10 +31,11 @@ const (
 )
 
 type keymap struct {
-	toggle, tune, allOn, allOff, review, refresh, scope, reload, help, quit, details, esc key.Binding
+	toggle, tune, allOn, allOff, review, refresh, scope, reload, help, quit, details, esc, browse key.Binding
 }
 
 var keys = keymap{
+	browse:  key.NewBinding(key.WithKeys("b"), key.WithHelp("b", "skills.sh")),
 	toggle:  key.NewBinding(key.WithKeys("space", "tab"), key.WithHelp("space", "toggle")),
 	tune:    key.NewBinding(key.WithKeys("enter", "t"), key.WithHelp("enter", "tune")),
 	allOn:   key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "all on")),
@@ -76,6 +78,13 @@ type model struct {
 	tuneChoice skills.State
 	rf         refreshState
 	helpOffset int
+
+	registry         registry.Client
+	view             listView
+	registryIDs      []string
+	loadingIndex     bool
+	manifests        map[string]string
+	manifestsPending map[string]bool
 }
 
 // Run opens the garden.
@@ -86,7 +95,14 @@ func Run(r skills.Repo, p skills.Paths) error {
 }
 
 func newModel(r skills.Repo, p skills.Paths) *model {
-	m := &model{repo: r, paths: p, isDark: true}
+	m := &model{
+		repo:             r,
+		paths:            p,
+		isDark:           true,
+		registry:         registry.New(p),
+		manifests:        map[string]string{},
+		manifestsPending: map[string]bool{},
+	}
 	m.st = newStyles(true)
 	m.reload()
 	m.list = list.New(m.items(), rowDelegate{m}, 40, 20)
@@ -115,7 +131,7 @@ func (m *model) applyStyles() {
 	ls.Filter.Cursor.Color = m.st.p.accent
 	m.list.Styles = ls
 	m.list.FilterInput.SetStyles(ls.Filter)
-	m.list.Title = m.st.subtle.Render(fmt.Sprintf("%d skills · / to filter", len(m.staged)))
+	m.updateTitle()
 }
 
 // reload reads the states from disk and drops anything staged.
@@ -124,12 +140,15 @@ func (m *model) reload() {
 	m.loadErr = err
 	m.before = entries
 	m.staged = append([]skills.Entry(nil), entries...)
+	m.appendRegistryEntries()
 }
 
 func (m *model) items() []list.Item {
-	out := make([]list.Item, len(m.staged))
+	var out []list.Item
 	for i, e := range m.staged {
-		out[i] = item{idx: i, name: e.Name, desc: m.repo.Describe(e.Name)}
+		if m.visible(e) {
+			out = append(out, item{idx: i, name: e.Name, desc: m.description(e.Name)})
+		}
 	}
 	return out
 }
@@ -137,10 +156,11 @@ func (m *model) items() []list.Item {
 // resetList rebuilds the rows after a reload, keeping the cursor.
 func (m *model) resetList() tea.Cmd {
 	idx := m.list.Index()
-	cmd := m.list.SetItems(m.items())
-	m.list.Select(min(idx, max(0, len(m.staged)-1)))
-	m.refreshPreview()
-	return paneCommand(cmd)
+	rows := m.items()
+	cmd := m.list.SetItems(rows)
+	m.list.Select(min(idx, max(0, len(rows)-1)))
+	m.updateTitle()
+	return tea.Batch(paneCommand(cmd), m.refreshPreview())
 }
 
 func (m *model) selectedIdx() int {
@@ -171,7 +191,7 @@ func (m *model) pending() int {
 func (m *model) growing() int {
 	n := 0
 	for _, e := range m.staged {
-		if e.State.Linked() {
+		if m.inCatalog(e) && e.State.Linked() {
 			n++
 		}
 	}
@@ -187,23 +207,25 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case paneMsg:
 		updated, cmd := m.list.Update(msg.msg)
 		m.list = updated
-		m.refreshPreview()
-		return m, paneCommand(cmd)
+		return m, tea.Batch(paneCommand(cmd), m.refreshPreview())
 	case refreshMsg:
 		return m, m.refreshDone(msg)
+	case indexMsg:
+		return m, m.indexLoaded(msg)
+	case manifestMsg:
+		return m, m.manifestLoaded(msg)
 	case tea.BackgroundColorMsg:
 		m.isDark = msg.IsDark()
 		m.st = newStyles(m.isDark)
 		m.applyStyles()
-		m.refreshPreview()
-		return m, nil
+		return m, m.refreshPreview()
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
-		m.layout()
+		cmd := m.layout()
 		if m.tune != nil {
 			m.tune = m.tune.WithWidth(max(1, m.dialogWidth()-4)).WithHeight(max(1, m.height-dialogChrome))
 		}
-		return m, nil
+		return m, cmd
 	}
 
 	switch m.mode {
@@ -245,12 +267,12 @@ func (m *model) updateGarden(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch {
 		case key.Matches(k, keys.details):
 			m.details = !m.details
-			m.layout()
-			return m, nil
+			return m, m.layout()
 		case key.Matches(k, keys.esc) && m.details:
 			m.details = false
-			m.layout()
-			return m, nil
+			return m, m.layout()
+		case key.Matches(k, keys.browse):
+			return m, m.toggleView()
 		case key.Matches(k, keys.esc) && m.list.IsFiltered():
 			// The list clears its own filter.
 		case key.Matches(k, keys.quit):
@@ -268,12 +290,20 @@ func (m *model) updateGarden(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(k, keys.tune):
 			return m, m.startTune()
 		case key.Matches(k, keys.allOn):
+			if m.catalogOnly() {
+				return m, nil
+			}
 			m.stageAllOn()
 			m.setStatus("Every skill staged on. Partial states kept; one skill per name.", false)
 			return m, nil
 		case key.Matches(k, keys.allOff):
+			if m.catalogOnly() {
+				return m, nil
+			}
 			for i := range m.staged {
-				m.staged[i].State = skills.Off
+				if m.inCatalog(m.staged[i]) {
+					m.staged[i].State = skills.Off
+				}
 			}
 			m.setStatus("Every skill staged off. Nothing is saved until you press s.", false)
 			return m, nil
@@ -303,10 +333,11 @@ func (m *model) updateGarden(msg tea.Msg) (tea.Model, tea.Cmd) {
 	before := m.selectedIdx()
 	var cmd tea.Cmd
 	m.list, cmd = m.list.Update(msg)
+	var previewCmd tea.Cmd
 	if m.selectedIdx() != before {
-		m.refreshPreview()
+		previewCmd = m.refreshPreview()
 	}
-	return m, paneCommand(cmd)
+	return m, tea.Batch(paneCommand(cmd), previewCmd)
 }
 
 // toggle turns an off skill on and anything else off.
@@ -331,7 +362,7 @@ func (m *model) stageAllOn() {
 		}
 	}
 	for i, e := range m.staged {
-		if name := skills.LinkName(e.Name); e.State == skills.Off && !taken[name] {
+		if name := skills.LinkName(e.Name); e.State == skills.Off && !taken[name] && m.inCatalog(e) {
 			m.staged[i].State = skills.On
 			taken[name] = true
 		}
@@ -370,9 +401,9 @@ func (m *model) listWidth() int {
 	return min(56, m.width/2)
 }
 
-func (m *model) layout() {
+func (m *model) layout() tea.Cmd {
 	if m.width == 0 {
-		return
+		return nil
 	}
 	lw := m.listWidth()
 	inner := max(1, m.height-chromeRows-2)
@@ -383,10 +414,10 @@ func (m *model) layout() {
 	}
 	m.preview.SetWidth(max(1, pw))
 	m.preview.SetHeight(inner)
-	m.refreshPreview()
+	return m.refreshPreview()
 }
 
-func (m *model) refreshPreview() {
+func (m *model) refreshPreview() tea.Cmd {
 	i := m.selectedIdx()
 	w := m.preview.Width()
 	if w < 20 {
@@ -394,7 +425,7 @@ func (m *model) refreshPreview() {
 	}
 	if i < 0 {
 		m.preview.SetContent(m.st.subtle.Width(w).Render("No skill matches the filter. Press esc to clear it."))
-		return
+		return nil
 	}
 	e := m.staged[i]
 	wrap := lipgloss.NewStyle().Width(w)
@@ -402,12 +433,14 @@ func (m *model) refreshPreview() {
 	if e.State != m.before[i].State {
 		head += m.st.subtle.Render("  was "+string(m.before[i].State)) + " " + m.st.cursor.Render("*")
 	}
-	body, err := m.repo.Manifest(e.Name)
-	if err != nil {
-		body = m.st.err.Render(err.Error())
+	body, cmd := m.previewBody(e.Name)
+	source := tildify(m.repo.Source(e.Name))
+	if skills.IsRegistryID(e.Name) && !m.repo.Has(e.Name) {
+		source = "skills.sh/" + e.Name
 	}
-	m.preview.SetContent(wrap.Render(head) + "\n" + wrap.Render(m.st.subtle.Render(tildify(m.repo.Source(e.Name)))) + "\n\n" + wrap.Render(body))
+	m.preview.SetContent(wrap.Render(head) + "\n" + wrap.Render(m.st.subtle.Render(source)) + "\n\n" + wrap.Render(body))
 	m.preview.GotoTop()
+	return cmd
 }
 
 func (m *model) dialogWidth() int { return max(1, min(88, m.width-4)) }
@@ -449,7 +482,7 @@ func (m *model) switchScope() tea.Cmd {
 
 func (m *model) header() string {
 	brand := m.st.badge.Render("✿ skills") + " " + m.st.title.Render("The skill garden")
-	count := m.st.subtle.Render(fmt.Sprintf("%d of %d growing · %d pending", m.growing(), len(m.staged), m.pending()))
+	count := m.st.subtle.Render(m.countLine())
 	line1 := brand + strings.Repeat(" ", max(1, m.width-lipgloss.Width(brand)-lipgloss.Width(count)-1)) + count
 	line2 := " " + m.st.subtle.Render(tildify(m.repo.SrcDir)+"  ·  "+string(m.paths.Scope)+" "+tildify(m.paths.LinkDir))
 	return short(line1, m.width) + "\n" + short(line2, m.width) + "\n" + m.st.faint.Render(strings.Repeat("─", max(1, m.width)))
@@ -491,7 +524,7 @@ func (m *model) hints() []hint {
 	case m.details:
 		return []hint{{"esc", "back"}, {"pgup pgdn", "scroll"}}
 	}
-	h := []hint{{"space", "toggle"}, {"enter", "tune"}, {"s", "review & save"}, {"r", "refresh"}, {"/", "filter"}}
+	h := []hint{{"space", "toggle"}, {"enter", "tune"}, {"s", "review & save"}, {"b", "skills.sh"}, {"r", "refresh"}, {"/", "filter"}}
 	if m.width < 60 {
 		h = append(h, hint{"ctrl+d", "preview"})
 	}
@@ -532,7 +565,7 @@ func (m *model) keysOverlay() string {
 		title string
 		rows  []hint
 	}{
-		{"Move", []hint{{"↑ ↓  j k", "move between skills"}, {"/", "filter by name or description"}, {"pgup pgdn", "scroll the SKILL.md preview"}, {"ctrl+d", "show only the preview (narrow terminals)"}}},
+		{"Move", []hint{{"↑ ↓  j k", "move between skills"}, {"/", "filter by name or description"}, {"pgup pgdn", "scroll the SKILL.md preview"}, {"ctrl+d", "show only the preview (narrow terminals)"}, {"b", "browse every skill on skills.sh, or back to the catalog"}}},
 		{"Stage", []hint{{"space tab", "turn a skill on, or anything else off"}, {"enter t", "tune: pick on, off, name-only or user-invocable-only"}, {"a", "stage every skill on; partial states are kept"}, {"n", "stage every skill off"}}},
 		{"Save", []hint{{"s", "review the staged changes, then save or discard"}, {"R", "reload from disk and drop staged changes"}, {"r", "refresh: replace installed copies with links"}, {"p", "switch scope: global or this Git project"}, {"q esc", "quit; asks first when changes are pending"}}},
 	}

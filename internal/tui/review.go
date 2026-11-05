@@ -7,6 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/jorden-parker/skills/internal/links"
+	"github.com/jorden-parker/skills/internal/registry"
 	"github.com/jorden-parker/skills/internal/settings"
 	"github.com/jorden-parker/skills/internal/skills"
 )
@@ -27,7 +28,7 @@ func (m *model) updateReview(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.staged = append([]skills.Entry(nil), m.before...)
 		m.mode = modeGarden
 		m.setStatus("Staged changes discarded. Your garden can wait.", false)
-		m.refreshPreview()
+		return m, m.refreshPreview()
 	case "esc", "n", "N", "q", "ctrl+c":
 		m.mode = modeGarden
 	}
@@ -37,6 +38,11 @@ func (m *model) updateReview(msg tea.Msg) (tea.Model, tea.Cmd) {
 // save applies the staged states to the link directories and settings.json,
 // then reloads so the list shows what actually happened.
 func (m *model) save() tea.Cmd {
+	if err := registry.FetchMissing(m.registry, m.repo, m.staged); err != nil {
+		m.mode = modeGarden
+		m.setStatus("Download failed: "+err.Error(), true)
+		return nil
+	}
 	var warnings []string
 	after, err := links.Apply(m.repo, m.paths, m.staged, func(s string) { warnings = append(warnings, s) })
 	if err != nil {

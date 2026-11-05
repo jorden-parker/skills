@@ -1,11 +1,15 @@
 package tui
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"charm.land/bubbles/v2/spinner"
@@ -32,16 +36,16 @@ func newFixture(t *testing.T) *fixture {
 	for _, id := range []string{"me/alpha", "me/beta"} {
 		writeSkill(t, dir, id)
 	}
-	r, err := skills.Find(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
 	t.Setenv("HOME", filepath.Join(base, "home"))
 	t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join(base, "claude"))
 	t.Setenv("CODEX_HOME", filepath.Join(base, "codex"))
 	t.Setenv("XDG_DATA_HOME", "")
 	t.Setenv("XDG_CACHE_HOME", "")
 	t.Setenv("SKILLS_REGISTRY_URL", "http://127.0.0.1:1")
+	r, err := skills.Find(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
 	return &fixture{t: t, base: base, repo: r, paths: skills.DefaultPaths()}
 }
 
@@ -87,6 +91,189 @@ func (f *fixture) states() map[string]skills.State {
 		out[e.Name] = e.State
 	}
 	return out
+}
+
+const registryIndexXML = `<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <sitemap><loc>https://www.skills.sh/sitemap-skills-1.xml</loc></sitemap>
+</sitemapindex>`
+
+const registryUrlsetXML = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://www.skills.sh/acme/tools/lint</loc></url>
+  <url><loc>https://www.skills.sh/acme/tools/me-alpha</loc></url>
+</urlset>`
+
+const lintRegistryBody = "---\nname: lint\ndescription: lint skill\n---\n# lint\n\nRegistry body of lint.\n"
+
+func serveRegistry(t *testing.T, failIndex bool) *atomic.Int32 {
+	t.Helper()
+	var hits atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		switch {
+		case failIndex:
+			http.Error(w, "down", http.StatusInternalServerError)
+		case r.URL.Path == "/sitemap.xml":
+			_, _ = w.Write([]byte(registryIndexXML))
+		case r.URL.Path == "/sitemap-skills-1.xml":
+			_, _ = w.Write([]byte(registryUrlsetXML))
+		case r.URL.Path == "/api/download/acme/tools/lint":
+			files := []map[string]string{{"path": "SKILL.md", "contents": lintRegistryBody}}
+			_ = json.NewEncoder(w).Encode(map[string]any{"files": files, "hash": "h"})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("SKILLS_REGISTRY_URL", server.URL)
+	return &hits
+}
+
+func rowNames(m *model) []string {
+	var names []string
+	for _, row := range m.items() {
+		names = append(names, row.(item).name)
+	}
+	return names
+}
+
+func stateOf(m *model, name string) skills.State {
+	for _, e := range m.staged {
+		if e.Name == name {
+			return e.State
+		}
+	}
+	return ""
+}
+
+func TestBrowseShowsRegistrySkillsThenReturnsToCatalog(t *testing.T) {
+	f := newFixture(t)
+	serveRegistry(t, false)
+	m := f.open()
+	_, cmd := m.Update(tea.KeyPressMsg{Code: 'b', Text: "b"})
+	if m.view != registryView || cmd == nil {
+		t.Fatalf("view = %v, cmd nil = %v", m.view, cmd == nil)
+	}
+	drain(m, cmd, 0)
+	if got := rowNames(m); !reflect.DeepEqual(got, []string{"acme/tools/lint", "acme/tools/me-alpha"}) {
+		t.Fatalf("registry rows = %v", got)
+	}
+	if view := ansi.Strip(m.View().Content); !strings.Contains(view, "skills.sh") {
+		t.Fatalf("header:\n%s", view)
+	}
+	press(m, "b")
+	if m.view != catalogView || !reflect.DeepEqual(rowNames(m), []string{"me/alpha", "me/beta"}) {
+		t.Fatalf("catalog rows = %v", rowNames(m))
+	}
+}
+
+func TestBrowseLoadsTheIndexOnlyOnce(t *testing.T) {
+	f := newFixture(t)
+	hits := serveRegistry(t, false)
+	m := f.open()
+	press(m, "b")
+	if err := os.Remove(f.paths.RegistryIndex); err != nil {
+		t.Fatal(err)
+	}
+	before := hits.Load()
+	press(m, "b", "b")
+	if hits.Load() != before {
+		t.Fatalf("requests after second browse = %d, want %d", hits.Load(), before)
+	}
+}
+
+func TestSelectingRegistrySkillFetchesPreviewOnce(t *testing.T) {
+	f := newFixture(t)
+	hits := serveRegistry(t, false)
+	m := f.open()
+	press(m, "b")
+	if view := ansi.Strip(m.View().Content); !strings.Contains(view, "Registry body of lint.") || !strings.Contains(view, "skills.sh/acme/tools/lint") {
+		t.Fatalf("preview:\n%s", view)
+	}
+	press(m, "down")
+	afterDown := hits.Load()
+	press(m, "up")
+	if hits.Load() != afterDown {
+		t.Fatalf("reselecting made a request: %d -> %d", afterDown, hits.Load())
+	}
+}
+
+func TestSpaceThenSaveDownloadsAndLinksRegistrySkill(t *testing.T) {
+	f := newFixture(t)
+	serveRegistry(t, false)
+	m := f.open()
+	press(m, "b")
+	press(m, "space", "s", "enter")
+	if m.mode != modeGarden || m.pending() != 0 {
+		t.Fatalf("mode %v, pending %d, status %q", m.mode, m.pending(), m.status)
+	}
+	if _, err := os.Stat(filepath.Join(f.paths.RegistryDir, "acme", "tools", "lint", "SKILL.md")); err != nil {
+		t.Fatalf("download missing: %v", err)
+	}
+	press(m, "b")
+	if got := f.states()["acme/tools/lint"]; got != skills.On {
+		t.Fatalf("lint = %s, want on", got)
+	}
+}
+
+func TestAllOnAndAllOffStayInTheCatalogView(t *testing.T) {
+	f := newFixture(t)
+	serveRegistry(t, false)
+	m := f.open()
+	press(m, "b")
+	press(m, "a")
+	if !strings.Contains(m.status, "catalog view") {
+		t.Fatalf("status = %q", m.status)
+	}
+	press(m, "n")
+	if !strings.Contains(m.status, "catalog view") {
+		t.Fatalf("status = %q", m.status)
+	}
+	press(m, "b")
+	press(m, "a")
+	if stateOf(m, "me/alpha") != skills.On {
+		t.Fatalf("all on did not turn on me/alpha")
+	}
+	for _, e := range m.staged {
+		if skills.IsRegistryID(e.Name) && !m.repo.Has(e.Name) && e.State != skills.Off {
+			t.Fatalf("%s turned %s on", e.Name, e.State)
+		}
+	}
+}
+
+func TestLoadingTheIndexLeavesCatalogCountsAlone(t *testing.T) {
+	f := newFixture(t)
+	serveRegistry(t, false)
+	m := f.open()
+	press(m, "b", "b")
+	if view := ansi.Strip(m.View().Content); !strings.Contains(view, "0 of 2 growing") {
+		t.Fatalf("header:\n%s", view)
+	}
+}
+
+func TestIndexFailureKeepsGardenUsable(t *testing.T) {
+	f := newFixture(t)
+	serveRegistry(t, true)
+	m := f.open()
+	press(m, "b")
+	if m.view != registryView || !m.statusErr || !strings.Contains(m.status, "skills.sh") {
+		t.Fatalf("status %q, err %v", m.status, m.statusErr)
+	}
+	press(m, "b")
+	if !reflect.DeepEqual(rowNames(m), []string{"me/alpha", "me/beta"}) {
+		t.Fatalf("catalog rows = %v", rowNames(m))
+	}
+}
+
+func TestReloadInSkillsShViewKeepsRegistryRows(t *testing.T) {
+	f := newFixture(t)
+	serveRegistry(t, false)
+	m := f.open()
+	press(m, "b", "R")
+	if m.view != registryView || !reflect.DeepEqual(rowNames(m), []string{"acme/tools/lint", "acme/tools/me-alpha"}) {
+		t.Fatalf("rows after reload = %v", rowNames(m))
+	}
 }
 
 func (f *fixture) open() *model {
