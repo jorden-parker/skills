@@ -50,7 +50,7 @@ starting, honor its STOP conditions, and update your row when done.
 | 013  | Publish a skill contract file that other launchers can filter on            | P2       | M      | —          | TODO                                                   |
 | 014  | Add one `pnpm test` that checks everything, run it in CI, update DOMPurify  | P2       | S      | —          | TODO (stale: keep the existing unittest `test` script) |
 | 015  | Put every skill-script test under `test/`; document the repo layout         | P2       | S      | —          | DONE (59f8648..61ff417)                                |
-| 016  | Rename the `skills/` source folder to `catalog/`; `sync` repoints old links | P2       | M      | 015        | TODO                                                   |
+| 016  | Rename the `skills/` source folder to `catalog/`; `sync` repoints old links | P2       | M      | 015        | DONE (e5aee6b, 4bc6ae2)                                |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 
@@ -72,6 +72,7 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 
 ## Execution log
 
+- 2026-11-05, plan 016: executor removed the doc comments the plan asked it to reword (the edit hook rejects comments), and also fixed `cli_test.go:360`'s error text. Review added a `CONTEXT.md` fix: the term is now **Catalog**. Rebased over `59b7f5e` (handoff edit carried into `catalog/`). Leftover untracked junk in the old `skills/` moved to `/tmp/claude-skills/old-skills-dir-leftovers`.
 - 2026-11-05, plan 015: first attempt stopped correctly. The pre-commit hook's `go test` ran inside a linked worktree, where git exports absolute `GIT_DIR`/`GIT_INDEX_FILE`. The tests' temp-repo `git init/commit` hit the real repo (stray commits, set `core.bare = true`; repaired, backup `.git/config.bak-2026-11-05`). Step 0 (unset those vars in `.husky/pre-commit`) was added and the retry landed cleanly.
 
 - 2026-09-14, plan 001: executor stopped once on a real obstacle (bash 3.2 cannot run `case` inside `$(...)`), fixed via a `state_tag` helper. Second revision moved the tag before the description so it is not truncated. Plan text updated to match. Applied via `plans/001-make-skill-toggle-state-obvious.patch`.
