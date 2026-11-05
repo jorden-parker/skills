@@ -6,6 +6,7 @@ import tempfile
 import unittest
 
 PLAN = Path(__file__).resolve().parents[2] / "skills" / "jorden" / "commit" / "plan"
+RENDER = Path(__file__).resolve().parents[2] / "skills" / "jorden" / "commit" / "render"
 
 
 class PlanTestCase(unittest.TestCase):
@@ -93,6 +94,22 @@ class PlanTestCase(unittest.TestCase):
         result = self.plan("gather")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("### a.txt\na\n", result.stdout)
+
+    def test_gather_on_a_clean_tree_says_nothing_to_commit(self):
+        (self.repo / "a.txt").unlink()
+        result = self.plan("gather")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("nothing to commit", result.stdout)
+
+    def test_build_rejects_the_no_open_flag(self):
+        result = self.plan("build", "--no-open", document=self.one_commit())
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("unrecognized arguments: --no-open", result.stderr)
+
+    def test_render_rejects_the_no_open_flag(self):
+        result = subprocess.run([str(RENDER), "--no-open", "plan.json"], cwd=self.repo, capture_output=True, text=True, check=False)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("unrecognized arguments: --no-open", result.stderr)
 
 
 if __name__ == "__main__":
