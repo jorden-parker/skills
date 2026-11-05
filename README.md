@@ -22,6 +22,7 @@ Skills write only under `/tmp/claude-skills` (mode 700), never into the reposito
 skills                        # open the garden: pick which skills are on
 skills list                   # show current state
 skills add geist              # link a skill
+skills add geist --scope project   # link into the current Git project only
 skills remove geist           # remove its links
 skills set geist name-only    # set a partial state directly (also NAME=STATE)
 skills sync                   # repair stale links, drop links to removed skills, no prompts
@@ -53,6 +54,12 @@ Redirected output is plain text, and `NO_COLOR` disables colour. Bare `skills` w
 
 Links point into `<checkout>/catalog/<author>/<name>`, so the command needs to know where the checkout is. It looks, in order, at `--repo PATH` (or `-C PATH`), `$SKILLS_REPO`, the path baked in when `install.sh` built it, then `~/src/skills`. A path without a `catalog/` directory is an error that names the path.
 
+### Scope
+
+`--scope global` (the default) links into `~/.agents/skills` and Claude's skills directory, and keeps states in `settings.json`. `--scope project` links into the current Git project instead: `<git root>/.agents/skills` and `<git root>/.claude/skills`, with partial states in `<git root>/.claude/settings.local.json`. The garden switches between the two with `p`. Project scope needs the current directory to be inside a Git repository.
+
+`skills refresh` works on global installs only. Project links are absolute symlinks into this checkout and are machine-local, so do not commit them.
+
 ### The skill garden
 
 `skills` with no arguments opens the garden, a terminal UI built on Charm’s Bubble Tea and Lip Gloss. The left pane lists every skill with its state; the right pane previews the selected `SKILL.md`. Nothing changes on disk until you save.
@@ -66,6 +73,7 @@ Links point into `<checkout>/catalog/<author>/<name>`, so the command needs to k
 | `s`             | Review the staged changes, then `enter` saves, `d` discards, `esc` returns                                |
 | `r`             | Refresh: show which installed copies would be replaced; `enter` applies, `f` scopes to the selected skill |
 | `R`             | Reload from disk and drop staged changes                                                                  |
+| `p`             | Switch scope: global, or the current Git project (only when nothing is staged)                            |
 | `/`             | Filter by name or description                                                                             |
 | `ctrl+d`        | Show only the preview in a narrow terminal                                                                |
 | `?`             | Key reference                                                                                             |

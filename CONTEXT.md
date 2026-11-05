@@ -30,6 +30,10 @@ _Avoid_: install, copy, deploy
 How visible an installed skill is on a machine: `on`, `off`, `name-only`, or `user-invocable-only`. A skill can be linked and still be off.
 _Avoid_: enabled, disabled, active
 
+**Scope**:
+Where a machine's Links and partial States live: `global` (the user's discovery directories and settings.json) or `project` (the current Git project's `.agents/skills`, `.claude/skills` and `.claude/settings.local.json`).
+_Avoid_: level, target, location
+
 **Override**:
 The recorded entry that gives a skill a State other than `on`. Absence of an Override means `on`.
 _Avoid_: setting, flag, config

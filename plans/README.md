@@ -51,7 +51,7 @@ starting, honor its STOP conditions, and update your row when done.
 | 014  | Add one `pnpm test` that checks everything, run it in CI, update DOMPurify  | P2       | S      | —          | TODO (stale: keep the existing unittest `test` script) |
 | 015  | Put every skill-script test under `test/`; document the repo layout         | P2       | S      | —          | DONE (59f8648..61ff417)                                |
 | 016  | Rename the `skills/` source folder to `catalog/`; `sync` repoints old links | P2       | M      | 015        | DONE (e5aee6b, 4bc6ae2)                                |
-| 017  | Add `--scope global\|project` and a garden scope key                        | P2       | M      | —          | TODO                                                   |
+| 017  | Add `--scope global\|project` and a garden scope key                        | P2       | M      | —          | DONE (0c4109b)                                         |
 | 018  | Browse every skills.sh skill in the garden; download and link any of them   | P2       | L      | 017        | TODO                                                   |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
