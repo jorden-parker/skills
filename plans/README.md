@@ -24,27 +24,33 @@ findings, rejections and direction notes are in the 2026-11-04 sections below.
 The audit ran without a selection step, so plans cover the top findings by
 leverage.
 
+Plans 015–016 were written on 2026-11-05 at commit `aeb7cfc` by the improve
+skill's `plan` variant, from a request to reorganise the repo. See
+"Reorganisation, 2026-11-05" below for what was kept and why.
+
 Execute in the order below. Each executor: read the plan fully before
 starting, honor its STOP conditions, and update your row when done.
 
 ## Execution order & status
 
-| Plan | Title                                                                      | Priority | Effort | Depends on | Status                                   |
-| ---- | -------------------------------------------------------------------------- | -------- | ------ | ---------- | ---------------------------------------- |
-| 001  | Make it obvious which skills are on, off, and just changed                 | P1       | S      | —          | DONE (applied 2026-09-14)                |
-| 002  | Make the python3 JSON fallback actually write Overrides                    | P1       | S      | —          | DONE (applied 2026-09-14)                |
-| 003  | Make `./install` start on Linux (GNU `mktemp` template)                    | P1       | S      | —          | REJECTED (Bash installer deleted)        |
-| 004  | Give `./install` a test suite and a lint gate, run on every commit         | P1       | M      | 003        | REJECTED (Go tests exist; lint → 014)    |
-| 005  | Stop `./install` overwriting or deleting Links it did not create           | P1       | S      | 004        | REJECTED (superseded by 010)             |
-| 006  | Fix `npm ci` hint in `preview`, add `--no-open`, smoke-test it             | P2       | S      | —          | TODO (stale: drop its 004 harness steps) |
-| 007  | Fix `FRONTEND.md` dark variant and font wiring; `pnpm add geist`           | P2       | S      | —          | TODO                                     |
-| 008  | Run format, lint and tests on GitHub Actions (Ubuntu + macOS)              | P2       | S      | 004, 006   | REJECTED (superseded by 014)             |
-| 009  | Add a `commit` skill that plans Conventional Commits as HTML               | P2       | M      | —          | DONE (e29035b)                           |
-| 010  | Leave links owned by other tools alone; only touch skills that changed     | P1       | M      | —          | TODO                                     |
-| 011  | Make settings.json writes safe: validate first, own only this repo's keys  | P1       | M      | —          | TODO                                     |
-| 012  | Fix the garden's refresh and save bugs                                     | P2       | S      | 010, 011   | TODO                                     |
-| 013  | Publish a skill contract file that other launchers can filter on           | P2       | M      | —          | TODO                                     |
-| 014  | Add one `pnpm test` that checks everything, run it in CI, update DOMPurify | P2       | S      | —          | TODO                                     |
+| Plan | Title                                                                       | Priority | Effort | Depends on | Status                                                 |
+| ---- | --------------------------------------------------------------------------- | -------- | ------ | ---------- | ------------------------------------------------------ |
+| 001  | Make it obvious which skills are on, off, and just changed                  | P1       | S      | —          | DONE (applied 2026-09-14)                              |
+| 002  | Make the python3 JSON fallback actually write Overrides                     | P1       | S      | —          | DONE (applied 2026-09-14)                              |
+| 003  | Make `./install` start on Linux (GNU `mktemp` template)                     | P1       | S      | —          | REJECTED (Bash installer deleted)                      |
+| 004  | Give `./install` a test suite and a lint gate, run on every commit          | P1       | M      | 003        | REJECTED (Go tests exist; lint → 014)                  |
+| 005  | Stop `./install` overwriting or deleting Links it did not create            | P1       | S      | 004        | REJECTED (superseded by 010)                           |
+| 006  | Fix `npm ci` hint in `preview`, add `--no-open`, smoke-test it              | P2       | S      | —          | TODO (stale: drop its 004 harness steps)               |
+| 007  | Fix `FRONTEND.md` dark variant and font wiring; `pnpm add geist`            | P2       | S      | —          | TODO                                                   |
+| 008  | Run format, lint and tests on GitHub Actions (Ubuntu + macOS)               | P2       | S      | 004, 006   | REJECTED (superseded by 014)                           |
+| 009  | Add a `commit` skill that plans Conventional Commits as HTML                | P2       | M      | —          | DONE (e29035b)                                         |
+| 010  | Leave links owned by other tools alone; only touch skills that changed      | P1       | M      | —          | TODO                                                   |
+| 011  | Make settings.json writes safe: validate first, own only this repo's keys   | P1       | M      | —          | TODO                                                   |
+| 012  | Fix the garden's refresh and save bugs                                      | P2       | S      | 010, 011   | TODO                                                   |
+| 013  | Publish a skill contract file that other launchers can filter on            | P2       | M      | —          | TODO                                                   |
+| 014  | Add one `pnpm test` that checks everything, run it in CI, update DOMPurify  | P2       | S      | —          | TODO (stale: keep the existing unittest `test` script) |
+| 015  | Put every skill-script test under `test/`; document the repo layout         | P2       | S      | —          | DONE (59f8648..61ff417)                                |
+| 016  | Rename the `skills/` source folder to `catalog/`; `sync` repoints old links | P2       | M      | 015        | TODO                                                   |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 
@@ -65,6 +71,8 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 - 007 is independent and touches only Markdown.
 
 ## Execution log
+
+- 2026-11-05, plan 015: first attempt stopped correctly. The pre-commit hook's `go test` ran inside a linked worktree, where git exports absolute `GIT_DIR`/`GIT_INDEX_FILE`. The tests' temp-repo `git init/commit` hit the real repo (stray commits, set `core.bare = true`; repaired, backup `.git/config.bak-2026-11-05`). Step 0 (unset those vars in `.husky/pre-commit`) was added and the retry landed cleanly.
 
 - 2026-09-14, plan 001: executor stopped once on a real obstacle (bash 3.2 cannot run `case` inside `$(...)`), fixed via a `state_tag` helper. Second revision moved the tag before the description so it is not truncated. Plan text updated to match. Applied via `plans/001-make-skill-toggle-state-obvious.patch`.
 - 2026-09-14, plan 002: applied via `plans/002-fix-python3-override-writer.patch`.
@@ -176,3 +184,31 @@ list` will still say "on" for skills Claude loads from claude-custom.
    the launcher wipes and re-copies the session skills dir on every launch.
    Coarse effort L; worth a design spike only if the budget overflow becomes
    painful.
+
+## Reorganisation, 2026-11-05 (plan variant at `aeb7cfc`)
+
+Request: regroup files so the layout is easy to navigate, behaviour unchanged.
+Verdict: the layout is already sound; one inconsistency is worth fixing
+(plan 015). Baseline at `aeb7cfc`: `go test ./...` ok, `pnpm test` 31 OK,
+`bash artifact/test.sh` 22 passed.
+
+Moves considered and rejected:
+
+- Go packages into `cmd/skills` or regrouped `internal/`: one package per
+  concern already, tests beside code. Moving `main.go` changes
+  `go build -o bin/skills .` in `install.sh`, `AGENTS.md` and `README.md` for
+  no navigational gain.
+- Splitting `internal/tui/app.go` (588 lines): reasonable later, but plans
+  010–012 edit the TUI and a split now would conflict with them.
+- Moving `artifact/` under `tools/` or into `skills/`: the web-research skill
+  links `../../../artifact/render`, and plan 014 cites `artifact/test.sh`.
+- Moving `artifact/test.sh` into `test/`: it tests a repo tool, not a linked
+  skill, so co-location is fine.
+
+Follow-up the same day: the maintainer disliked `~/src/skills/skills/` and
+chose to rename the inner folder to `catalog/` (repo, module, command and
+checkout keep `skills`). That is plan 016. Run it after 015 and **before
+010**: 010 changes `links.Link` to leave foreign links alone, and it must then
+count links into the old `skills/` folder (`Repo.OldSrcDir`) as owned.
+Plans 006, 007, 013 and 014 cite `skills/...` paths; after 016 read those as
+`catalog/...`.
