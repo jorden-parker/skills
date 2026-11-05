@@ -52,7 +52,7 @@ starting, honor its STOP conditions, and update your row when done.
 | 015  | Put every skill-script test under `test/`; document the repo layout         | P2       | S      | —          | DONE (59f8648..61ff417)                                |
 | 016  | Rename the `skills/` source folder to `catalog/`; `sync` repoints old links | P2       | M      | 015        | DONE (e5aee6b, 4bc6ae2)                                |
 | 017  | Add `--scope global\|project` and a garden scope key                        | P2       | M      | —          | DONE (0c4109b)                                         |
-| 018  | Browse every skills.sh skill in the garden; download and link any of them   | P2       | L      | 017        | TODO                                                   |
+| 018  | Browse every skills.sh skill in the garden; download and link any of them   | P2       | L      | 017        | DONE (c5f4cd3..204bddb)                                |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 
@@ -219,3 +219,5 @@ checkout keep `skills`). That is plan 016. Run it after 015 and **before
 count links into the old `skills/` folder (`Repo.OldSrcDir`) as owned.
 Plans 006, 007, 013 and 014 cite `skills/...` paths; after 016 read those as
 `catalog/...`.
+
+- 2026-11-05, plans 017 and 018: 017's executor could not commit because the worktree had no `node_modules` for lint-staged. The reviewer applied its diff on main. In 018's review round, the TUI save was found to pass ~20k Off skills.sh rows to `links.Apply`, which would have unlinked foreign symlinks that share a name with any skills.sh skill. It was fixed in 204bddb, and `Downloaded()` now skips `.download-*` dirs. A 018 test once wrote to the real `~/.local/share` (the fixture set HOME too late); the executor fixed the order and removed the file. The interactive smoke test against the real skills.sh was not run.
