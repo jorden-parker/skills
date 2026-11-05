@@ -242,6 +242,25 @@ func TestAllOnAndAllOffStayInTheCatalogView(t *testing.T) {
 	}
 }
 
+func TestSaveLeavesForeignLinksForUndownloadedRegistrySkills(t *testing.T) {
+	f := newFixture(t)
+	serveRegistry(t, false)
+	m := f.open()
+	press(m, "b", "b")
+	foreignLink := filepath.Join(f.paths.LinkDir, "me-alpha")
+	if err := os.MkdirAll(f.paths.LinkDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(t.TempDir(), foreignLink); err != nil {
+		t.Fatal(err)
+	}
+	selectSkill(t, m, "me/beta")
+	press(m, "space", "s", "enter")
+	if !isLink(foreignLink) {
+		t.Fatal("save removed a link owned by another tool")
+	}
+}
+
 func TestLoadingTheIndexLeavesCatalogCountsAlone(t *testing.T) {
 	f := newFixture(t)
 	serveRegistry(t, false)

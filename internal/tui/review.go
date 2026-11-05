@@ -38,13 +38,14 @@ func (m *model) updateReview(msg tea.Msg) (tea.Model, tea.Cmd) {
 // save applies the staged states to the link directories and settings.json,
 // then reloads so the list shows what actually happened.
 func (m *model) save() tea.Cmd {
-	if err := registry.FetchMissing(m.registry, m.repo, m.staged); err != nil {
+	toApply := m.stagedForApply()
+	if err := registry.FetchMissing(m.registry, m.repo, toApply); err != nil {
 		m.mode = modeGarden
 		m.setStatus("Download failed: "+err.Error(), true)
 		return nil
 	}
 	var warnings []string
-	after, err := links.Apply(m.repo, m.paths, m.staged, func(s string) { warnings = append(warnings, s) })
+	after, err := links.Apply(m.repo, m.paths, toApply, func(s string) { warnings = append(warnings, s) })
 	if err != nil {
 		m.mode = modeGarden
 		m.setStatus("Save failed: "+err.Error(), true)
@@ -64,6 +65,18 @@ func (m *model) save() tea.Cmd {
 	}
 	m.setStatus(status, len(warnings) > 0)
 	return m.resetList()
+}
+
+func (m *model) stagedForApply() []skills.Entry {
+	var out []skills.Entry
+	for i, e := range m.staged {
+		unshownRegistryOff := skills.IsRegistryID(e.Name) && !m.repo.Has(e.Name) &&
+			m.before[i].State == skills.Off && e.State == skills.Off
+		if !unshownRegistryOff {
+			out = append(out, e)
+		}
+	}
+	return out
 }
 
 func (m *model) reviewView() string {
