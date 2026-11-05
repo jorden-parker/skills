@@ -15,39 +15,63 @@ Output rule: say nothing in chat before or between commands and do not list comm
 
 ## Steps
 
-1. **Gather.** Run `<skill-directory>/plan gather` from the repository root. It prints the commitlint config, recent subjects, `.gitignore`, status, diff and untracked file contents. If it prints `nothing to commit`, stop.
+Run every command from the repository root. `<skill-directory>` is this skill's folder.
 
-2. **Learn the repo's convention.** From that output, note commitlint `type-enum`, `scope-enum` and `header-max-length`, and the scope habits and casing in recent subjects. With nothing to go on, use the Conventional Commits defaults: `feat fix refactor perf test docs build ci chore style revert`. Keep subjects lowercase and without a final full stop.
+1. **Gather.**
+   - Run: `<skill-directory>/plan gather`
+   - Output: sections `convention`, `ignore candidates`, `commitlint config`, `recent subjects`, `.gitignore`, `status`, `diff stat`, `diff`, `untracked files`.
+   - If the output is `nothing to commit`: stop.
 
-3. **Ignore first.** Before grouping, find untracked or changed files that no repository should track: build output, caches, dependency folders, logs, editor and OS files (`.DS_Store`, `.idea/`), local env files, and output from tools run in this session (`.playwright-mcp/`). Read the existing `.gitignore` and do not repeat a pattern it already has. Prefer a folder or glob pattern (`dist/`, `*.log`) over single files. Put the patterns, each with a short reason, in `ignore.patterns`. If a tracked file matches, add it to `ignore.untrack`; the page shows that the next push removes it from the remote. Leave out anything a teammate might rely on, such as a shared editor config that is already committed.
+2. **Starter JSON.**
+   - Run: `<skill-directory>/plan skeleton`
+   - Output: a JSON object. Keep it as your working JSON. It has one commit holding every changed path, `"header": "TODO"`, and `ignore` filled from the candidates.
 
-4. **Group.** One logical change per commit:
-   - Tests go in the same commit as the code they test, unless the change is test-only.
-   - Lockfiles go with the manifest change that caused them.
-   - Generated files go with their source.
-   - Pure formatting or renames come before behaviour changes, as their own `style:` or `refactor:` commit.
-   - Order commits so every prefix of the list builds: dependencies first.
-   - Split within a file only when it clearly holds two unrelated changes. Then put the unified diff text of only that commit's hunks, relative to the state after the previous commits, in the commit's `patch`. A commit may have both `paths` and `patch`.
-   - Prefer fewer, coherent commits. If unsure, merge.
+3. **Ignore.**
+   - Input: `## ignore candidates` (`path | pattern | reason`, plus `untrack` for tracked paths).
+   - Keep every candidate in `ignore`. Remove one only if it is a shared config a teammate relies on; then also move its path back into the commit `paths`.
+   - Add another pattern only if it is clearly local-only in the same categories (build output, caches, dependencies, logs, editor or OS files, local env files, tool output). Prefer folder or glob patterns.
 
-5. **Exclude.** A change that should not be committed yet, but should not be ignored either (such as a secret pasted into a tracked file), goes in `excluded` with a reason. Never put a secret's content in the plan.
+4. **Group.** Split the commit into more commits only with these rules, in this order:
+   1. Dependencies first, so every prefix of the list builds.
+   2. `style` or `refactor` changes come before behaviour changes.
+   3. Tests go in the same commit as the code they test, unless the change is test-only.
+   4. A lockfile goes with the manifest that changed it.
+   5. Generated files go with their source.
+   - Default: one commit. If unsure, keep one commit.
+   - `patch` is only for a file that holds two clearly unrelated changes. Put the unified diff of that commit's hunks, relative to the state after the previous commits, in `patch`. Otherwise leave `patch` out.
+   - Every changed path appears in exactly one commit's `paths`, in `ignore`, or in `excluded`.
 
-6. **Build.** Run once, from the repository root:
+5. **Header.** For each commit set `header` to `type(scope): subject`.
+   - Take `type` and `scope` from `## convention`. If `scopes` is `any`, copy the scope habit of `## recent subjects`, or leave the scope out.
+   - Lowercase, no full stop, whole header within `max header length`.
+   - `!` before the colon marks a breaking change. No footers (no `BREAKING CHANGE:`, `Refs:`, trailers).
+   - `why`: one line on why these files belong together.
+   - `body`: empty, unless the change is very complex and the header cannot carry the why. Then short plain text wrapped at 72, no attribution lines.
 
-   ```sh
-   <skill-directory>/plan build <<'EOF'
-   {"commits": [{"header": "feat(cli)!: add --dry-run flag", "why": "One line: why these files belong together.",
-                 "paths": ["internal/cli/run.go", "internal/cli/run_test.go"], "patch": "", "body": ""}],
-    "ignore": {"patterns": {".playwright-mcp/": "browser tool output"}, "subject": "ignore local files", "untrack": []},
-    "excluded": [{"path": ".env.local", "reason": "looks like a secret"}]}
-   EOF
-   ```
+6. **Excluded.** A secret pasted into a tracked file goes in `excluded` as `{"path": "...", "reason": "..."}`, and its path leaves the commit `paths`. Give the path and reason only, never the secret's content.
 
-   - `ignore` and `excluded` are optional. `patch` and `body` are optional.
-   - A `!` in the header sets `breaking`. Never add footers (no `BREAKING CHANGE:`, `Refs:`, trailers).
-   - Leave `body` out unless the change is very complex and the header cannot carry the why; then keep it short plain text, wrapped at 72, no attribution lines.
-   - It writes `plan.json` under `/tmp/claude-skills/commit/` (or `$SKILLS_TMPDIR`), checks the plan against the working tree, replays every commit in a temporary index, writes the HTML page and prints its path. If it fails, fix the JSON and rerun. Never hand the user a plan that failed.
+7. **Build.**
+   - Run: `<skill-directory>/plan build <<'EOF'` followed by the JSON and a line `EOF`.
+   - Output: the page path on success.
+   - On failure, read the error line and apply the fix, then rerun. Retry up to 3 times, then stop and reply with the last error line.
 
-7. **Open** the page: Run `open <path>` as its own command (no `&&`, no quotes).
+   | Error line contains                                       | Fix                                                                                         |
+   | --------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+   | `header must look like`                                   | Rewrite the header as `type(scope): subject`. Replace every `TODO`.                         |
+   | `type '...' is not allowed`, `scope '...' is not allowed` | Use a type or scope listed in `## convention`.                                              |
+   | `full stop`, `characters, over the limit`                 | Remove the full stop, or shorten the subject.                                               |
+   | `needs paths or patch`                                    | Give that commit `paths`, or delete the commit.                                             |
+   | `do not reproduce the working tree`                       | Fix the `patch` so it matches the diff, or move its file into `paths` and drop the `patch`. |
+   | `HEAD is`                                                 | HEAD moved. Rerun from step 1.                                                              |
+   | `is not in any commit, excluded, or ignored`              | Add the path to a commit's `paths`.                                                         |
+   | `is listed in more than one commit`                       | Keep the path in one commit only.                                                           |
+   | `has no changes`                                          | Remove the path from `paths`.                                                               |
+   | `is tracked and matches a new pattern`                    | Add the path to `ignore.untrack`.                                                           |
+   | `is in untrack but no tracked file`                       | Remove the path from `ignore.untrack`.                                                      |
+   | `is already in .gitignore`                                | Remove that pattern from `ignore.patterns`.                                                 |
+   | `patch file not found`, or another patch error            | Move the file into `paths` and drop the `patch`.                                            |
+   | `stdin is not valid JSON`                                 | Fix the JSON syntax.                                                                        |
 
-8. **Reply** with only the page path. The user runs the commands.
+8. **Open.**
+   - Run: `open <path>` as its own command (no `&&`, no quotes).
+   - Reply with only the page path.

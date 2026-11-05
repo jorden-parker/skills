@@ -14,7 +14,7 @@ The command symlinks the skills you pick into both `~/.agents/skills` and `${CLA
 
 ## Where skills write
 
-Skills write only under `/tmp/claude-skills` (mode 700), never into the repository or its git dir: `commit/<repo-key>/`, `pr-draft/<repo-key>/`, `artifacts/` and `handoff/`. `<repo-key>` hashes the git dir and branch, so repos, worktrees and branches stay apart. Set `SKILLS_TMPDIR` to use another base, as the tests do.
+Skills write only under `/tmp/claude-skills` (mode 700), never into the repository or its git dir: `commit/<repo-key>/`, `pr-draft/<repo-key>/`, `artifacts/` and `handoff/` (written by `handoff-save`, read by `handoff-resume`). `<repo-key>` hashes the git dir and branch, so repos, worktrees and branches stay apart. Set `SKILLS_TMPDIR` to use another base, as the tests do.
 
 ## Commands
 
@@ -116,14 +116,16 @@ It needs Python 3 and the same one-time `pnpm install`.
 
 ## Skills
 
-| Skill                                          | What it does                                                                                                    |
-| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| [`pr-draft`](catalog/jorden/pr-draft/)         | Opens a draft PR for the current branch, or updates the existing one. `/`-invoked only.                         |
-| [`geist`](catalog/jorden/geist/)               | Vercel's Geist Design System — real tokens, type scale, component recipes.                                      |
-| [`new-project`](catalog/jorden/new-project/)   | Initialises tooling in an existing project or scaffolds a new one, inferred from the directory.                 |
-| [`web-research`](catalog/jorden/web-research/) | Researches a question on the live web and shows the findings as a cited page. `/`-invoked only.                 |
-| [`commit`](catalog/jorden/commit/)             | Sorts changes into Conventional Commits as copyable commands on a local page. `/`-invoked only.                 |
-| [`handoff`](catalog/jorden/handoff/)           | Compacts the conversation into a handoff document for the next agent. Same name as Matt’s; one is on at a time. |
+| Skill                                              | What it does                                                                                                    |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| [`pr-draft`](catalog/jorden/pr-draft/)             | Opens a draft PR for the current branch, or updates the existing one. `/`-invoked only.                         |
+| [`geist`](catalog/jorden/geist/)                   | Vercel's Geist Design System — real tokens, type scale, component recipes.                                      |
+| [`new-project`](catalog/jorden/new-project/)       | Initialises tooling in an existing project or scaffolds a new one, inferred from the directory.                 |
+| [`web-research`](catalog/jorden/web-research/)     | Researches a question on the live web and shows the findings as a cited page. `/`-invoked only.                 |
+| [`commit`](catalog/jorden/commit/)                 | Sorts changes into Conventional Commits as copyable commands on a local page. `/`-invoked only.                 |
+| [`handoff`](catalog/jorden/handoff/)               | Compacts the conversation into a handoff document for the next agent. Same name as Matt’s; one is on at a time. |
+| [`handoff-save`](catalog/jorden/handoff-save/)     | Writes the handoff note. Called by `handoff`; turn it on separately.                                            |
+| [`handoff-resume`](catalog/jorden/handoff-resume/) | Picks up the newest handoff note for this repo. Called by `handoff`; turn it on separately.                     |
 
 ### Upstream skills
 

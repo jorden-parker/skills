@@ -2,7 +2,10 @@
 """Gather repo state for the commit skill, then build and render its plan."""
 
 import argparse
+import fnmatch
 import hashlib
+import importlib.machinery
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -13,6 +16,21 @@ import sys
 HEADER_PATTERN = re.compile(r"^(?P<type>[a-z]+)(\((?P<scope>[^)]+)\))?(?P<bang>!)?: (?P<subject>.+)$")
 DEFAULT_IGNORE_SUBJECT = "ignore local files"
 MAX_UNTRACKED_BYTES = 100 * 1024
+LOCAL_ONLY_PATTERNS = {
+    "node_modules/": "dependency folder",
+    "dist/": "build output",
+    "build/": "build output",
+    "coverage/": "test coverage output",
+    ".cache/": "cache folder",
+    "__pycache__/": "Python bytecode cache",
+    "*.pyc": "Python bytecode",
+    "*.log": "log file",
+    ".DS_Store": "macOS folder metadata",
+    ".idea/": "editor settings",
+    ".env": "local environment file",
+    ".env.*": "local environment file",
+    ".playwright-mcp/": "browser tool output",
+}
 
 
 class PlanError(Exception):
@@ -91,6 +109,52 @@ def untracked_contents():
     return "\n".join(shown)
 
 
+def load_render():
+    path = Path(__file__).resolve().parent / "render"
+    loader = importlib.machinery.SourceFileLoader("commit_render", str(path))
+    module = importlib.util.module_from_spec(importlib.util.spec_from_loader("commit_render", loader))
+    loader.exec_module(module)
+    return module
+
+
+def convention_text():
+    convention = load_render().read_convention(Path("."))
+    scopes = " ".join(convention["scopes"]) if convention["scopes"] else "any"
+    return f"types: {' '.join(convention['types'])}\nscopes: {scopes}\nmax header length: {convention['header_limit']}"
+
+
+def matching_pattern(name):
+    parts = name.split("/")
+    for pattern in LOCAL_ONLY_PATTERNS:
+        if pattern.endswith("/") and pattern[:-1] in parts[:-1]:
+            return pattern
+        if not pattern.endswith("/") and fnmatch.fnmatch(parts[-1], pattern):
+            return pattern
+    return None
+
+
+def ignored_patterns():
+    gitignore = Path(".gitignore")
+    lines = gitignore.read_text(encoding="utf-8").splitlines() if gitignore.exists() else []
+    return {line.strip().lstrip("/") for line in lines}
+
+
+def ignore_candidates():
+    untracked = git_output("ls-files", "--others", "--exclude-standard").splitlines()
+    tracked = git_output("ls-files").splitlines()
+    already = ignored_patterns()
+    candidates = []
+    for name, is_tracked in [*((name, False) for name in untracked), *((name, True) for name in tracked)]:
+        pattern = matching_pattern(name)
+        if pattern and pattern not in already:
+            candidates.append({"path": name, "pattern": pattern, "reason": LOCAL_ONLY_PATTERNS[pattern], "tracked": is_tracked})
+    return candidates
+
+
+def candidates_text(candidates):
+    return "\n".join(f"{item['path']} | {item['pattern']} | {item['reason']}" + (" | untrack" if item["tracked"] else "") for item in candidates)
+
+
 def handle_gather(arguments):
     status = git_output("--no-optional-locks", "status", "--porcelain=v2", "--untracked-files=all")
     if not status:
@@ -98,6 +162,8 @@ def handle_gather(arguments):
         return
     gitignore = Path(".gitignore")
     sections = [
+        ("convention", convention_text()),
+        ("ignore candidates", candidates_text(ignore_candidates())),
         ("commitlint config", commitlint_config()),
         ("recent subjects", git_output("log", "--format=%s", "-30")),
         (".gitignore", gitignore.read_text(encoding="utf-8") if gitignore.exists() else ""),
@@ -107,6 +173,34 @@ def handle_gather(arguments):
         ("untracked files", untracked_contents()),
     ]
     print("\n".join(section(title, body) for title, body in sections if body))
+
+
+def changed_paths():
+    entries = git_output("-c", "core.quotePath=false", "--no-optional-locks", "status", "--porcelain=v1", "-z", "--untracked-files=all")
+    fields = entries.split("\0")
+    paths, index = [], 0
+    while index < len(fields) and fields[index]:
+        code, name = fields[index][:2], fields[index][3:]
+        paths.append(name)
+        index += 1
+        if "R" in code or "C" in code:
+            paths.append(fields[index])
+            index += 1
+    return paths
+
+
+def handle_skeleton(arguments):
+    candidates = ignore_candidates()
+    ignored = {item["path"] for item in candidates}
+    paths = [name for name in changed_paths() if name not in ignored]
+    skeleton = {"commits": [{"header": "TODO", "why": "TODO", "paths": paths}]}
+    if candidates:
+        skeleton["ignore"] = {
+            "patterns": {item["pattern"]: item["reason"] for item in candidates},
+            "subject": DEFAULT_IGNORE_SUBJECT,
+            "untrack": [item["path"] for item in candidates if item["tracked"]],
+        }
+    print(json.dumps(skeleton, indent=2))
 
 
 def commit_entry(raw, position, directory):
@@ -165,6 +259,7 @@ def build_parser():
     parser = argparse.ArgumentParser(description=__doc__)
     subcommands = parser.add_subparsers(dest="command", required=True)
     subcommands.add_parser("gather", help="print what is needed to plan commits").set_defaults(handler=handle_gather)
+    subcommands.add_parser("skeleton", help="print a starter build JSON for the working tree").set_defaults(handler=handle_skeleton)
     build = subcommands.add_parser("build", help="read plan JSON on stdin, write plan.json and render the page")
     build.set_defaults(handler=handle_build)
     return parser

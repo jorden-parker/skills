@@ -101,6 +101,72 @@ class PlanTestCase(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("nothing to commit", result.stdout)
 
+    def gather(self):
+        result = self.plan("gather")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return result.stdout
+
+    def test_gather_convention_reads_commitlint_enum(self):
+        rules = {"type-enum": [2, "always", ["feat", "fix"]], "scope-enum": [2, "always", ["cli"]], "header-max-length": [2, "always", 50]}
+        (self.repo / ".commitlintrc.json").write_text(json.dumps({"rules": rules}), encoding="utf-8")
+        output = self.gather()
+        self.assertIn("## convention", output)
+        self.assertIn("types: feat fix", output)
+        self.assertIn("scopes: cli", output)
+        self.assertIn("max header length: 50", output)
+
+    def test_gather_convention_defaults(self):
+        output = self.gather()
+        self.assertIn("scopes: any", output)
+        self.assertIn("max header length: 72", output)
+        self.assertIn("feat", output.split("types:")[1].splitlines()[0])
+
+    def test_gather_lists_untracked_ignore_candidates(self):
+        (self.repo / "dist").mkdir()
+        (self.repo / "dist" / "out.js").write_text("x\n", encoding="utf-8")
+        section = self.gather().split("## ignore candidates")[1].split("\n## ")[0]
+        self.assertIn("dist/", section)
+        self.assertNotIn("untrack", section)
+
+    def test_gather_marks_tracked_candidates_untrack(self):
+        (self.repo / "debug.log").write_text("x\n", encoding="utf-8")
+        self.git("add", "-f", "debug.log")
+        self.git("commit", "-q", "-m", "chore: log")
+        (self.repo / "debug.log").write_text("y\n", encoding="utf-8")
+        section = self.gather().split("## ignore candidates")[1].split("\n## ")[0]
+        self.assertIn("*.log", section)
+        self.assertIn("untrack", section)
+
+    def test_gather_leaves_out_patterns_already_ignored(self):
+        (self.repo / ".gitignore").write_text("dist/\n", encoding="utf-8")
+        (self.repo / "dist").mkdir()
+        (self.repo / "dist" / "out.js").write_text("x\n", encoding="utf-8")
+        (self.repo / "run.log").write_text("x\n", encoding="utf-8")
+        section = self.gather().split("## ignore candidates")[1].split("\n## ")[0]
+        self.assertIn("run.log", section)
+        self.assertNotIn("dist/", section)
+
+    def skeleton(self):
+        result = self.plan("skeleton")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def test_skeleton_holds_changed_paths_and_ignore(self):
+        (self.repo / "dist").mkdir()
+        (self.repo / "dist" / "out.js").write_text("x\n", encoding="utf-8")
+        skeleton = self.skeleton()
+        self.assertEqual(skeleton["commits"][0]["paths"], ["a.txt"])
+        self.assertEqual(skeleton["commits"][0]["header"], "TODO")
+        self.assertIn("dist/", skeleton["ignore"]["patterns"])
+
+    def test_skeleton_is_rejected_by_build_until_header_is_set(self):
+        skeleton = self.skeleton()
+        result = self.plan("build", document=skeleton)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("header must look like", result.stderr)
+        skeleton["commits"][0]["header"] = "feat: add a"
+        self.build(skeleton)
+
     def test_build_rejects_the_no_open_flag(self):
         result = self.plan("build", "--no-open", document=self.one_commit())
         self.assertEqual(result.returncode, 2)
