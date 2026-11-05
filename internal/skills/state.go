@@ -79,26 +79,76 @@ type Entry struct {
 }
 
 // LoadStates reads the state of every skill in the repo. A skill is linked
-// when ~/.agents/skills/<name> exists in any form; a linked skill takes its
-// override from settings.json, else on. Unlinked skills are off.
+// when ~/.agents/skills/<link name> exists in any form, unless it points at a
+// same-name sibling. A linked skill takes its override from settings.json,
+// else on. Unlinked skills are off.
 func LoadStates(r Repo, p Paths) ([]Entry, error) {
-	names, err := r.Names()
+	ids, err := r.Names()
 	if err != nil {
 		return nil, err
 	}
 	overrides := settings.ReadOverrides(p.Settings)
-	out := make([]Entry, 0, len(names))
-	for _, name := range names {
+	out := make([]Entry, 0, len(ids))
+	for _, id := range ids {
 		st := Off
-		if lexists(filepath.Join(p.LinkDir, name)) {
+		if linkedTo(r, p, ids, id) {
 			st = On
-			if o, err := ParseState(overrides[name]); err == nil && o != Off {
+			if o, err := ParseState(overrides[LinkName(id)]); err == nil && o != Off {
 				st = o
 			}
 		}
-		out = append(out, Entry{Name: name, State: st})
+		out = append(out, Entry{Name: id, State: st})
 	}
 	return out, nil
+}
+
+func linkedTo(r Repo, p Paths, ids []string, id string) bool {
+	link := filepath.Join(p.LinkDir, LinkName(id))
+	if !lexists(link) {
+		return false
+	}
+	for _, sibling := range ids {
+		if sibling != id && LinkName(sibling) == LinkName(id) && ResolvesTo(link, r.Source(sibling)) {
+			return false
+		}
+	}
+	return true
+}
+
+// ResolvesTo reports whether path resolves to the same directory as source.
+func ResolvesTo(path, source string) bool {
+	got, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return false
+	}
+	want, err := filepath.EvalSymlinks(source)
+	return err == nil && got == want
+}
+
+// Stage sets the state of the entry with this ID. A linked state turns off
+// every other entry with the same link name, so one skill per name is on.
+func Stage(entries []Entry, id string, st State) {
+	for i := range entries {
+		switch {
+		case entries[i].Name == id:
+			entries[i].State = st
+		case st.Linked() && LinkName(entries[i].Name) == LinkName(id):
+			entries[i].State = Off
+		}
+	}
+}
+
+// Overrides maps each link name to the state settings.json should hold. When
+// siblings share a name, the linked one wins.
+func Overrides(entries []Entry) map[string]string {
+	out := make(map[string]string, len(entries))
+	for _, e := range entries {
+		name := LinkName(e.Name)
+		if _, seen := out[name]; !seen || e.State.Linked() {
+			out[name] = string(e.State)
+		}
+	}
+	return out
 }
 
 // lexists reports whether a path exists, counting dangling symlinks.

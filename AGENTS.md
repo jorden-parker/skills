@@ -1,6 +1,7 @@
 # Updating skills
 
-`skills/<name>/` is the source of truth. After updating a skill, run
+`skills/<author>/<name>/` is the source of truth; refresh takes the ID
+(`author/name`) or a unique bare name. After updating a skill, run
 `skills refresh <name>` and then `skills refresh --check <name>` before reporting
 completion. Use `skills refresh` without names to refresh all repo skills. Without
 the command on PATH, build it first: `go build -o bin/skills .` and use

@@ -12,8 +12,8 @@ import (
 func setup(t *testing.T) (skills.Repo, skills.Paths) {
 	t.Helper()
 	base := t.TempDir()
-	for _, name := range []string{"alpha", "beta"} {
-		src := filepath.Join(base, "repo", "skills", name)
+	for _, id := range []string{"me/alpha", "me/beta", "other/beta"} {
+		src := filepath.Join(base, "repo", "skills", id)
 		if err := os.MkdirAll(src, 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -39,12 +39,12 @@ func TestLinkCreatesBothAndRelinks(t *testing.T) {
 	r, p := setup(t)
 	var warned []string
 	warn := func(s string) { warned = append(warned, s) }
-	blocked, err := Link(r.Source("alpha"), "alpha", p.LinkDirs(), warn)
+	blocked, err := Link(r.Source("me/alpha"), "alpha", p.LinkDirs(), warn)
 	if err != nil || blocked || len(warned) != 0 {
 		t.Fatal(blocked, err, warned)
 	}
 	for _, dir := range p.LinkDirs() {
-		if dest, _ := os.Readlink(filepath.Join(dir, "alpha")); dest != r.Source("alpha") {
+		if dest, _ := os.Readlink(filepath.Join(dir, "alpha")); dest != r.Source("me/alpha") {
 			t.Fatalf("%s -> %s", dir, dest)
 		}
 	}
@@ -55,10 +55,10 @@ func TestLinkCreatesBothAndRelinks(t *testing.T) {
 	if err := os.Symlink("/elsewhere", filepath.Join(p.LinkDir, "alpha")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Link(r.Source("alpha"), "alpha", p.LinkDirs(), warn); err != nil {
+	if _, err := Link(r.Source("me/alpha"), "alpha", p.LinkDirs(), warn); err != nil {
 		t.Fatal(err)
 	}
-	if dest, _ := os.Readlink(filepath.Join(p.LinkDir, "alpha")); dest != r.Source("alpha") {
+	if dest, _ := os.Readlink(filepath.Join(p.LinkDir, "alpha")); dest != r.Source("me/alpha") {
 		t.Fatalf("not relinked: %s", dest)
 	}
 }
@@ -74,7 +74,7 @@ func TestRealDirectoryBlocksAndSurvives(t *testing.T) {
 	}
 	var warned []string
 	warn := func(s string) { warned = append(warned, s) }
-	blocked, err := Link(r.Source("alpha"), "alpha", p.LinkDirs(), warn)
+	blocked, err := Link(r.Source("me/alpha"), "alpha", p.LinkDirs(), warn)
 	if err != nil || !blocked {
 		t.Fatal(blocked, err)
 	}
@@ -105,11 +105,11 @@ func TestApplyKeepsBlockedUnlinkOn(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(p.LinkDir, "alpha"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	got, err := Apply(r, p, []skills.Entry{{Name: "alpha", State: skills.Off}, {Name: "beta", State: skills.NameOnly}}, func(string) {})
+	got, err := Apply(r, p, []skills.Entry{{Name: "me/alpha", State: skills.Off}, {Name: "me/beta", State: skills.NameOnly}}, func(string) {})
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []skills.Entry{{Name: "alpha", State: skills.On}, {Name: "beta", State: skills.NameOnly}}
+	want := []skills.Entry{{Name: "me/alpha", State: skills.On}, {Name: "me/beta", State: skills.NameOnly}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %v", got)
 	}
@@ -129,7 +129,7 @@ func TestPruneRemovesOnlyDanglingLinksIntoRepo(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		must(os.Symlink(r.Source("alpha"), filepath.Join(dir, "alpha")))
+		must(os.Symlink(r.Source("me/alpha"), filepath.Join(dir, "alpha")))
 		must(os.Symlink(r.Source("gone"), filepath.Join(dir, "gone")))
 		must(os.Symlink(filepath.Join(r.Dir, "elsewhere"), filepath.Join(dir, "other")))
 		must(os.Symlink(filepath.Join(r.Dir, "skills-old", "x"), filepath.Join(dir, "lookalike")))
@@ -148,5 +148,49 @@ func TestPruneRemovesOnlyDanglingLinksIntoRepo(t *testing.T) {
 				t.Fatalf("%s/%s was removed", dir, n)
 			}
 		}
+	}
+}
+
+func TestApplySwapsSiblingsWithoutLosingTheNewLink(t *testing.T) {
+	r, p := setup(t)
+	if _, err := Link(r.Source("other/beta"), "beta", p.LinkDirs(), func(string) {}); err != nil {
+		t.Fatal(err)
+	}
+	entries := []skills.Entry{{Name: "me/beta", State: skills.On}, {Name: "other/beta", State: skills.Off}}
+	if _, err := Apply(r, p, entries, func(string) {}); err != nil {
+		t.Fatal(err)
+	}
+	for _, dir := range p.LinkDirs() {
+		if dest, _ := os.Readlink(filepath.Join(dir, "beta")); dest != r.Source("me/beta") {
+			t.Fatalf("%s/beta -> %q", dir, dest)
+		}
+	}
+}
+
+func TestMigrateRelinksFlatLinksToTheirAuthorFolder(t *testing.T) {
+	r, p := setup(t)
+	for _, dir := range p.LinkDirs() {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		for _, name := range []string{"alpha", "beta", "gone"} {
+			if err := os.Symlink(filepath.Join(r.SrcDir, name), filepath.Join(dir, name)); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	relinked, err := Migrate(r, p.LinkDirs())
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{filepath.Join(p.LinkDir, "alpha"), filepath.Join(p.ClaudeLinkDir, "alpha")}
+	if !reflect.DeepEqual(relinked, want) {
+		t.Fatalf("relinked = %v, want %v", relinked, want)
+	}
+	if dest, _ := os.Readlink(filepath.Join(p.LinkDir, "alpha")); dest != r.Source("me/alpha") {
+		t.Fatalf("alpha -> %q", dest)
+	}
+	if dest, _ := os.Readlink(filepath.Join(p.LinkDir, "beta")); dest != filepath.Join(r.SrcDir, "beta") {
+		t.Fatalf("ambiguous beta was touched: %q", dest)
 	}
 }

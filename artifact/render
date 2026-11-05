@@ -147,7 +147,7 @@ def main():
             if problems:
                 listing = "\n".join(f"  - {problem}" for problem in problems)
                 parser.exit(2, f"artifact: citations are red, nothing rendered. Fix {args.body} and rerun:\n{listing}\n")
-        geist = root.parent / "skills/geist"
+        geist = root.parent / "skills/jorden/geist"
         modules = root.parent / "node_modules"
         if not (modules / "marked/lib/marked.umd.js").is_file() or not (modules / "dompurify/dist/purify.min.js").is_file():
             parser.exit(1, f"artifact: run pnpm install in {root.parent} first\n")

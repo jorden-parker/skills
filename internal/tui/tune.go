@@ -45,7 +45,7 @@ func (m *model) updateTune(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.mode, m.tune = modeGarden, nil
 		return m, nil
 	case huh.StateCompleted:
-		m.staged[m.tuneIdx].State = m.tuneChoice
+		skills.Stage(m.staged, m.staged[m.tuneIdx].Name, m.tuneChoice)
 		m.mode, m.tune = modeGarden, nil
 		m.status = ""
 		m.refreshPreview()

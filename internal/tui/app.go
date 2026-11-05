@@ -267,12 +267,8 @@ func (m *model) updateGarden(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(k, keys.tune):
 			return m, m.startTune()
 		case key.Matches(k, keys.allOn):
-			for i := range m.staged {
-				if m.staged[i].State == skills.Off {
-					m.staged[i].State = skills.On
-				}
-			}
-			m.setStatus("Every skill staged on. Partial states kept.", false)
+			m.stageAllOn()
+			m.setStatus("Every skill staged on. Partial states kept; one skill per name.", false)
 			return m, nil
 		case key.Matches(k, keys.allOff):
 			for i := range m.staged {
@@ -311,12 +307,28 @@ func (m *model) toggle(i int) {
 	if i < 0 {
 		return
 	}
+	next := skills.Off
 	if m.staged[i].State == skills.Off {
-		m.staged[i].State = skills.On
-	} else {
-		m.staged[i].State = skills.Off
+		next = skills.On
 	}
+	skills.Stage(m.staged, m.staged[i].Name, next)
 	m.status = ""
+}
+
+// stageAllOn turns on every off skill whose name no sibling already holds.
+func (m *model) stageAllOn() {
+	taken := map[string]bool{}
+	for _, e := range m.staged {
+		if e.State.Linked() {
+			taken[skills.LinkName(e.Name)] = true
+		}
+	}
+	for i, e := range m.staged {
+		if name := skills.LinkName(e.Name); e.State == skills.Off && !taken[name] {
+			m.staged[i].State = skills.On
+			taken[name] = true
+		}
+	}
 }
 
 type paneMsg struct{ msg tea.Msg }

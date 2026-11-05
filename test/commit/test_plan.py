@@ -5,7 +5,7 @@ import subprocess
 import tempfile
 import unittest
 
-SKILL_DIRECTORY = Path(__file__).resolve().parents[2] / "skills" / "commit"
+SKILL_DIRECTORY = Path(__file__).resolve().parents[2] / "skills" / "jorden" / "commit"
 PLAN = SKILL_DIRECTORY / "plan"
 RENDER = SKILL_DIRECTORY / "render"
 

@@ -29,15 +29,8 @@ func newFixture(t *testing.T) *fixture {
 	t.Helper()
 	base := t.TempDir()
 	dir := filepath.Join(base, "repo with spaces")
-	for _, name := range []string{"alpha", "beta"} {
-		src := filepath.Join(dir, "skills", name)
-		if err := os.MkdirAll(src, 0o755); err != nil {
-			t.Fatal(err)
-		}
-		body := "---\nname: " + name + "\ndescription: " + name + " skill\n---\n# " + name + "\n\nBody of " + name + ".\n"
-		if err := os.WriteFile(filepath.Join(src, "SKILL.md"), []byte(body), 0o644); err != nil {
-			t.Fatal(err)
-		}
+	for _, id := range []string{"me/alpha", "me/beta"} {
+		writeSkill(t, dir, id)
 	}
 	r, err := skills.Find(dir)
 	if err != nil {
@@ -47,6 +40,19 @@ func newFixture(t *testing.T) *fixture {
 	t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join(base, "claude"))
 	t.Setenv("CODEX_HOME", filepath.Join(base, "codex"))
 	return &fixture{t: t, base: base, repo: r, paths: skills.DefaultPaths()}
+}
+
+func writeSkill(t *testing.T, dir, id string) {
+	t.Helper()
+	name := filepath.Base(id)
+	src := filepath.Join(dir, "skills", id)
+	if err := os.MkdirAll(src, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := "---\nname: " + name + "\ndescription: " + name + " skill\n---\n# " + name + "\n\nBody of " + name + ".\n"
+	if err := os.WriteFile(filepath.Join(src, "SKILL.md"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // set applies states the way the CLI does, so the garden starts from them.
@@ -62,11 +68,7 @@ func (f *fixture) set(states map[string]skills.State) {
 	if err != nil {
 		f.t.Fatal(err)
 	}
-	ov := map[string]string{}
-	for _, e := range after {
-		ov[e.Name] = string(e.State)
-	}
-	if err := settings.WriteOverrides(f.paths.Settings, ov); err != nil {
+	if err := settings.WriteOverrides(f.paths.Settings, skills.Overrides(after)); err != nil {
 		f.t.Fatal(err)
 	}
 }
@@ -172,9 +174,9 @@ func isLink(path string) bool {
 
 func TestStageThenSavePreservesPartialStates(t *testing.T) {
 	f := newFixture(t)
-	f.set(map[string]skills.State{"alpha": skills.NameOnly})
+	f.set(map[string]skills.State{"me/alpha": skills.NameOnly})
 	m := f.open()
-	selectSkill(t, m, "beta")
+	selectSkill(t, m, "me/beta")
 	press(m, "space")
 	if m.pending() != 1 || m.staged[1].State != skills.On {
 		t.Fatalf("staged = %v", m.staged)
@@ -194,7 +196,7 @@ func TestStageThenSavePreservesPartialStates(t *testing.T) {
 	if m.mode != modeGarden || m.pending() != 0 {
 		t.Fatalf("mode %v pending %d", m.mode, m.pending())
 	}
-	want := map[string]skills.State{"alpha": skills.NameOnly, "beta": skills.On}
+	want := map[string]skills.State{"me/alpha": skills.NameOnly, "me/beta": skills.On}
 	if got := f.states(); !reflect.DeepEqual(got, want) {
 		t.Fatalf("states = %v", got)
 	}
@@ -212,9 +214,9 @@ func TestCanStartWithNoEnabledSkills(t *testing.T) {
 	if m.growing() != 0 {
 		t.Fatal("something is on")
 	}
-	selectSkill(t, m, "beta")
+	selectSkill(t, m, "me/beta")
 	press(m, "tab", "s", "y")
-	want := map[string]skills.State{"alpha": skills.Off, "beta": skills.On}
+	want := map[string]skills.State{"me/alpha": skills.Off, "me/beta": skills.On}
 	if got := f.states(); !reflect.DeepEqual(got, want) {
 		t.Fatalf("states = %v", got)
 	}
@@ -223,7 +225,7 @@ func TestCanStartWithNoEnabledSkills(t *testing.T) {
 func TestDiscardWritesNothing(t *testing.T) {
 	f := newFixture(t)
 	m := f.open()
-	selectSkill(t, m, "alpha")
+	selectSkill(t, m, "me/alpha")
 	press(m, "t")
 	if m.mode != modeTune || m.tune == nil {
 		t.Fatal("t did not open the tune form")
@@ -271,7 +273,7 @@ func TestQuitWithPendingAsksFirst(t *testing.T) {
 
 func TestSaveWithoutChangesLeavesSettingsAlone(t *testing.T) {
 	f := newFixture(t)
-	f.set(map[string]skills.State{"alpha": skills.On})
+	f.set(map[string]skills.State{"me/alpha": skills.On})
 	before, err := os.ReadFile(f.paths.Settings)
 	if err != nil {
 		t.Fatal(err)
@@ -295,9 +297,9 @@ func TestSaveWithoutChangesLeavesSettingsAlone(t *testing.T) {
 
 func TestTuneCanTurnOffLastSkill(t *testing.T) {
 	f := newFixture(t)
-	f.set(map[string]skills.State{"alpha": skills.On})
+	f.set(map[string]skills.State{"me/alpha": skills.On})
 	m := f.open()
-	selectSkill(t, m, "alpha")
+	selectSkill(t, m, "me/alpha")
 	press(m, "enter")
 	if m.mode != modeTune {
 		t.Fatal("enter did not open the tune form")
@@ -310,7 +312,7 @@ func TestTuneCanTurnOffLastSkill(t *testing.T) {
 		t.Fatalf("staged = %v", m.staged)
 	}
 	press(m, "s", "enter")
-	want := map[string]skills.State{"alpha": skills.Off, "beta": skills.Off}
+	want := map[string]skills.State{"me/alpha": skills.Off, "me/beta": skills.Off}
 	if got := f.states(); !reflect.DeepEqual(got, want) {
 		t.Fatalf("states = %v", got)
 	}
@@ -321,7 +323,7 @@ func TestTuneCanTurnOffLastSkill(t *testing.T) {
 
 func TestAllOnKeepsPartialStatesAndAllOffClears(t *testing.T) {
 	f := newFixture(t)
-	f.set(map[string]skills.State{"alpha": skills.UserInvocableOnly})
+	f.set(map[string]skills.State{"me/alpha": skills.UserInvocableOnly})
 	m := f.open()
 	press(m, "a")
 	if m.staged[0].State != skills.UserInvocableOnly || m.staged[1].State != skills.On {
@@ -349,8 +351,8 @@ func TestRefreshScreenPlansThenApplies(t *testing.T) {
 	git("init")
 	git("add", ".")
 	git("-c", "user.name=Test", "-c", "user.email=test@example.test", "-c", "core.hooksPath=/dev/null", "commit", "-m", "initial")
-	old, _ := os.ReadFile(filepath.Join(f.repo.SrcDir, "alpha", "SKILL.md"))
-	if err := os.WriteFile(filepath.Join(f.repo.SrcDir, "alpha", "SKILL.md"), []byte("newer\n"), 0o644); err != nil {
+	old, _ := os.ReadFile(filepath.Join(f.repo.SrcDir, "me", "alpha", "SKILL.md"))
+	if err := os.WriteFile(filepath.Join(f.repo.SrcDir, "me", "alpha", "SKILL.md"), []byte("newer\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	target := filepath.Join(f.paths.LinkDir, "alpha")
@@ -399,7 +401,7 @@ func TestRefreshScreenPlansThenApplies(t *testing.T) {
 
 func TestViewFitsTheTerminal(t *testing.T) {
 	f := newFixture(t)
-	f.set(map[string]skills.State{"alpha": skills.NameOnly})
+	f.set(map[string]skills.State{"me/alpha": skills.NameOnly})
 	m := f.open()
 	for _, size := range [][2]int{{80, 24}, {120, 40}, {50, 20}} {
 		m.Update(tea.WindowSizeMsg{Width: size[0], Height: size[1]})
@@ -430,4 +432,34 @@ func TestViewFitsTheTerminal(t *testing.T) {
 	if view := ansi.Strip(m.View().Content); !m.details || !strings.Contains(view, "Body of alpha") {
 		t.Fatalf("ctrl+d: details=%v\n%s", m.details, view)
 	}
+}
+
+func TestToggleAndAllOnKeepOneSkillPerName(t *testing.T) {
+	f := newFixture(t)
+	writeSkill(t, f.repo.Dir, "other/alpha")
+	f.set(map[string]skills.State{"me/alpha": skills.NameOnly})
+	m := f.open()
+	press(m, "a")
+	want := map[string]skills.State{"me/alpha": skills.NameOnly, "me/beta": skills.On, "other/alpha": skills.Off}
+	if got := stagedStates(m); !reflect.DeepEqual(got, want) {
+		t.Fatalf("after a: %v", got)
+	}
+	selectSkill(t, m, "other/alpha")
+	press(m, "space")
+	want = map[string]skills.State{"me/alpha": skills.Off, "me/beta": skills.On, "other/alpha": skills.On}
+	if got := stagedStates(m); !reflect.DeepEqual(got, want) {
+		t.Fatalf("after toggle: %v", got)
+	}
+	press(m, "s", "enter")
+	if got := f.states(); !reflect.DeepEqual(got, want) {
+		t.Fatalf("saved: %v", got)
+	}
+}
+
+func stagedStates(m *model) map[string]skills.State {
+	out := map[string]skills.State{}
+	for _, e := range m.staged {
+		out[e.Name] = e.State
+	}
+	return out
 }

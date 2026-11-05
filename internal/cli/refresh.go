@@ -2,7 +2,7 @@ package cli
 
 import (
 	"fmt"
-	"strings"
+	"io"
 
 	"github.com/spf13/cobra"
 
@@ -21,18 +21,19 @@ Looks in ~/.agents/skills, $CODEX_HOME/skills and Claude's skills directory.
 A copy is recognised when its SKILL.md matches the current source or a
 version in this checkout's Git history. Recognised copies are backed up under
 skill-backups beside the installation's skills directory, then replaced with
-links. Unrecognised copies, including broken links, are left untouched and
-reported for review.`,
+links. A link to the old flat skills/<name> path is relinked to the skill's
+author folder. Unrecognised copies, including other broken links, are left
+untouched and reported for review.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			r, err := find()
 			if err != nil {
 				return err
 			}
-			if unknown := refresh.Unknown(r, args); len(unknown) > 0 {
-				fmt.Fprintf(cmd.ErrOrStderr(), "error: unknown skills: %s\n", strings.Join(unknown, ", "))
+			ids, ok := resolveAll(r, args, cmd.ErrOrStderr())
+			if !ok {
 				return exitError{2}
 			}
-			results, failed := refresh.Run(r, skills.DefaultPaths(), args, check, nil)
+			results, failed := refresh.Run(r, skills.DefaultPaths(), ids, check, nil)
 			out, errOut := cmd.OutOrStdout(), cmd.ErrOrStderr()
 			for _, res := range results {
 				switch res.Status {
@@ -56,4 +57,21 @@ reported for review.`,
 	}
 	c.Flags().BoolVar(&check, "check", false, "report without changing files; exit 1 if refresh or review is needed")
 	return c
+}
+
+// resolveAll turns each argument into a skill ID, reporting every one that
+// does not resolve.
+func resolveAll(r skills.Repo, args []string, errOut io.Writer) ([]string, bool) {
+	ids := make([]string, 0, len(args))
+	ok := true
+	for _, arg := range args {
+		id, err := r.Resolve(arg)
+		if err != nil {
+			fmt.Fprintf(errOut, "error: %v\n", err)
+			ok = false
+			continue
+		}
+		ids = append(ids, id)
+	}
+	return ids, ok
 }

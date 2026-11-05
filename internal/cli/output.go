@@ -63,8 +63,9 @@ func (p printer) list(r skills.Repo, paths skills.Paths, entries []skills.Entry)
 	p.blank()
 	p.bold("Skills in " + r.SrcDir)
 	p.blank()
+	width := nameWidth(entries)
 	for _, e := range entries {
-		p.printf("  %s %-14s %s\n", p.state(e.State), e.Name, r.Describe(e.Name))
+		p.printf("  %s %-*s %s\n", p.state(e.State), width, e.Name, r.Describe(e.Name))
 	}
 	p.blank()
 	p.dim("  on, name-only and user-invocable-only are linked into " + paths.LinkDir + " and " + paths.ClaudeLinkDir + "; off is not")
@@ -77,6 +78,7 @@ func (p printer) changes(before, after []skills.Entry) {
 		prev[e.Name] = e.State
 	}
 	changed := false
+	width := nameWidth(after)
 	for _, e := range after {
 		if prev[e.Name] == e.State {
 			continue
@@ -86,12 +88,20 @@ func (p printer) changes(before, after []skills.Entry) {
 			p.bold("Changed")
 			changed = true
 		}
-		p.printf("  %-14s %s -> %s\n", e.Name, p.state(prev[e.Name]), p.state(e.State))
+		p.printf("  %-*s %s -> %s\n", width, e.Name, p.state(prev[e.Name]), p.state(e.State))
 	}
 	if !changed {
 		p.blank()
 		p.dim("No states changed.")
 	}
+}
+
+func nameWidth(entries []skills.Entry) int {
+	width := 0
+	for _, e := range entries {
+		width = max(width, len(e.Name))
+	}
+	return width
 }
 
 const sessionHint = "Start a new Claude Code session for this to take effect."

@@ -77,18 +77,15 @@ func applyStates(cmd *cobra.Command, find finder, pairs []string) error {
 		if !ok || name == "" {
 			return fmt.Errorf("expected NAME=STATE, got: %s", pair)
 		}
-		if !r.Has(name) {
-			return fmt.Errorf("no such skill: %s", name)
+		id, err := r.Resolve(name)
+		if err != nil {
+			return err
 		}
 		st, err := skills.ParseState(value)
 		if err != nil {
 			return err
 		}
-		for i := range staged {
-			if staged[i].Name == name {
-				staged[i].State = st
-			}
-		}
+		skills.Stage(staged, id, st)
 	}
 	p := newPrinter(cmd.OutOrStdout())
 	after, err := save(r, paths, staged, p.warn)
@@ -107,13 +104,5 @@ func save(r skills.Repo, paths skills.Paths, staged []skills.Entry, warn links.W
 	if err != nil {
 		return nil, err
 	}
-	return after, settings.WriteOverrides(paths.Settings, overrides(after))
-}
-
-func overrides(entries []skills.Entry) map[string]string {
-	out := make(map[string]string, len(entries))
-	for _, e := range entries {
-		out[e.Name] = string(e.State)
-	}
-	return out
+	return after, settings.WriteOverrides(paths.Settings, skills.Overrides(after))
 }

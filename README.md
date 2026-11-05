@@ -49,7 +49,7 @@ Redirected output is plain text, and `NO_COLOR` disables colour. Bare `skills` w
 
 ### Where the checkout lives
 
-Links point into `<checkout>/skills/<name>`, so the command needs to know where the checkout is. It looks, in order, at `--repo PATH` (or `-C PATH`), `$SKILLS_REPO`, the path baked in when `install.sh` built it, then `~/src/skills`. A path without a `skills/` directory is an error that names the path.
+Links point into `<checkout>/skills/<author>/<name>`, so the command needs to know where the checkout is. It looks, in order, at `--repo PATH` (or `-C PATH`), `$SKILLS_REPO`, the path baked in when `install.sh` built it, then `~/src/skills`. A path without a `skills/` directory is an error that names the path.
 
 ### The skill garden
 
@@ -73,11 +73,11 @@ Saving writes the links and `settings.json`, keeps a `.bak` of the previous sett
 
 ### PR description preview
 
-`/pr-draft` describes the current working tree, committed or not, and renders the description as a local HTML page. It makes no Git or GitHub changes. It uses [a reusable body template](skills/pr-draft/assets/body.md) when the target repository has none. Preview a body file directly:
+`/pr-draft` describes the current working tree, committed or not, and renders the description as a local HTML page. It makes no Git or GitHub changes. It uses [a reusable body template](skills/jorden/pr-draft/assets/body.md) when the target repository has none. Preview a body file directly:
 
 ```sh
 pnpm install
-./skills/pr-draft/preview /tmp/claude-skills/pr-draft/pr-body.md --title "Cache the resolved config" --output /tmp/claude-skills/pr-draft/pr-preview.html
+./skills/jorden/pr-draft/preview /tmp/claude-skills/pr-draft/pr-body.md --title "Cache the resolved config" --output /tmp/claude-skills/pr-draft/pr-preview.html
 ```
 
 The draft follows the target repository's PR template, preserving its sections and checklists. Pass the completed body to preview it. Omit the body path to preview the local repository's template, using `--repo <path>` when outside that repository; the bundled template is the fallback when none exists. If several templates exist, pass the chosen file explicitly.
@@ -96,19 +96,19 @@ It needs Python 3 and the same one-time `pnpm install`.
 
 ## Skills
 
-| Skill                                  | What it does                                                                                    |
-| -------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| [`pr-draft`](skills/pr-draft/)         | Opens a draft PR for the current branch, or updates the existing one. `/`-invoked only.         |
-| [`geist`](skills/geist/)               | Vercel's Geist Design System — real tokens, type scale, component recipes.                      |
-| [`new-project`](skills/new-project/)   | Initialises tooling in an existing project or scaffolds a new one, inferred from the directory. |
-| [`web-research`](skills/web-research/) | Researches a question on the live web and shows the findings as a cited page. `/`-invoked only. |
-| [`commit`](skills/commit/)             | Sorts changes into Conventional Commits as copyable commands on a local page. `/`-invoked only. |
+| Skill                                         | What it does                                                                                    |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| [`pr-draft`](skills/jorden/pr-draft/)         | Opens a draft PR for the current branch, or updates the existing one. `/`-invoked only.         |
+| [`geist`](skills/jorden/geist/)               | Vercel's Geist Design System — real tokens, type scale, component recipes.                      |
+| [`new-project`](skills/jorden/new-project/)   | Initialises tooling in an existing project or scaffolds a new one, inferred from the directory. |
+| [`web-research`](skills/jorden/web-research/) | Researches a question on the live web and shows the findings as a cited page. `/`-invoked only. |
+| [`commit`](skills/jorden/commit/)             | Sorts changes into Conventional Commits as copyable commands on a local page. `/`-invoked only. |
 
 ### Upstream skills
 
 This checkout also includes all 29 published skills from [Matt Pocock](https://github.com/mattpocock/skills) and [shadcn’s `improve`](https://github.com/shadcn/improve). Matt’s `in-progress` directory is excluded. Each skill includes its supporting files and upstream MIT license.
 
-These are editable snapshots under `skills/<name>/`, available through the same picker as the local skills. New skills stay off until selected:
+These are editable snapshots under `skills/mattpocock/<name>/` and `skills/shadcn/improve/`, available through the same picker as the local skills. New skills stay off until selected:
 
 ```sh
 skills                          # select the skills you want
@@ -119,10 +119,19 @@ skills add improve              # enable shadcn’s codebase advisor
 
 For Matt’s engineering workflow, enable `setup-matt-pocock-skills` and run `/setup-matt-pocock-skills` once in the target project to configure its issue tracker and documentation layout. Start a fresh agent session after enabling skills.
 
+### Authors and same-name skills
+
+Each skill lives in its author's folder: `skills/jorden/` for this repo's own, `skills/mattpocock/` and `skills/shadcn/` for upstream snapshots. A skill's ID is `author/name`, and it is linked as `name`. Two authors may ship the same name, such as `mattpocock/handoff` and `jorden/handoff`, but only one can be on at a time: turning one on switches its sibling off. A bare name works wherever it is unique:
+
+```sh
+skills add jorden/handoff       # switches mattpocock/handoff off
+skills add geist                # unique, so the author can be left out
+```
+
 ## Repo layout
 
 ```
-skills/<name>/SKILL.md   the skills themselves
+skills/<author>/<name>/  the skills themselves, grouped by author
 main.go, internal/       the skills command (Go + Charm)
 install.sh               builds and installs the command
 artifact/                the shared Markdown-to-page renderer

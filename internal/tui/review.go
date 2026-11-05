@@ -44,11 +44,7 @@ func (m *model) save() tea.Cmd {
 		m.setStatus("Save failed: "+err.Error(), true)
 		return nil
 	}
-	ov := make(map[string]string, len(after))
-	for _, e := range after {
-		ov[e.Name] = string(e.State)
-	}
-	if err := settings.WriteOverrides(m.paths.Settings, ov); err != nil {
+	if err := settings.WriteOverrides(m.paths.Settings, skills.Overrides(after)); err != nil {
 		m.mode = modeGarden
 		m.reload()
 		m.setStatus("Links updated but settings.json failed: "+err.Error(), true)

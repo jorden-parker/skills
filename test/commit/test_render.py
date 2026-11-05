@@ -7,7 +7,7 @@ import subprocess
 import tempfile
 import unittest
 
-RENDER = Path(__file__).resolve().parents[2] / "skills" / "commit" / "render"
+RENDER = Path(__file__).resolve().parents[2] / "skills" / "jorden" / "commit" / "render"
 TAG_PATTERN = re.compile(r"<[^>]+>")
 
 
@@ -30,7 +30,7 @@ class RenderTestCase(unittest.TestCase):
         self.base = self.git("rev-parse", "HEAD").strip()
         self.git_dir = Path(self.git("rev-parse", "--absolute-git-dir").strip())
         environment = {**os.environ, "SKILLS_TMPDIR": str(Path(temporary.name, "skills-tmp"))}
-        plan_command = Path(__file__).resolve().parents[2] / "skills" / "commit" / "plan"
+        plan_command = Path(__file__).resolve().parents[2] / "skills" / "jorden" / "commit" / "plan"
         printed = subprocess.run([str(plan_command), "dir"], cwd=self.repo, capture_output=True, text=True, check=True, env=environment)
         self.plan_dir = Path(printed.stdout.strip()).resolve()
         self.assertNotIn(str(self.git_dir), str(self.plan_dir))

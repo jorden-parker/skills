@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -44,33 +45,73 @@ func Find(flag string) (Repo, error) {
 	return r, nil
 }
 
-// Names lists every directory under skills/ that holds a SKILL.md, sorted.
+// Names lists the ID (author/name) of every skills/<author>/<name>/ that
+// holds a SKILL.md, sorted.
 func (r Repo) Names() ([]string, error) {
-	entries, err := os.ReadDir(r.SrcDir)
+	authors, err := os.ReadDir(r.SrcDir)
 	if err != nil {
 		return nil, err
 	}
-	var names []string
-	for _, e := range entries {
-		if fi, err := os.Stat(filepath.Join(r.SrcDir, e.Name(), "SKILL.md")); err == nil && fi.Mode().IsRegular() {
-			names = append(names, e.Name())
+	var ids []string
+	for _, author := range authors {
+		skillDirs, err := os.ReadDir(filepath.Join(r.SrcDir, author.Name()))
+		if err != nil {
+			continue
+		}
+		for _, skillDir := range skillDirs {
+			if id := author.Name() + "/" + skillDir.Name(); r.Has(id) {
+				ids = append(ids, id)
+			}
 		}
 	}
-	sort.Strings(names)
-	return names, nil
+	sort.Strings(ids)
+	return ids, nil
 }
 
-// Has reports whether name is a skill in the repo.
-func (r Repo) Has(name string) bool {
-	if name == "" || strings.ContainsAny(name, `/\`) {
+// Has reports whether id is exactly author/name and names a skill in the repo.
+func (r Repo) Has(id string) bool {
+	author, name, ok := strings.Cut(id, "/")
+	if !ok || !validSegment(author) || !validSegment(name) {
 		return false
 	}
-	fi, err := os.Stat(filepath.Join(r.SrcDir, name, "SKILL.md"))
+	fi, err := os.Stat(filepath.Join(r.SrcDir, author, name, "SKILL.md"))
 	return err == nil && fi.Mode().IsRegular()
 }
 
-// Source is the directory of the named skill.
-func (r Repo) Source(name string) string { return filepath.Join(r.SrcDir, name) }
+func validSegment(s string) bool {
+	return s != "" && s != "." && s != ".." && !strings.ContainsAny(s, `/\`)
+}
+
+// LinkName is the name a skill is linked under: the last segment of its ID.
+func LinkName(id string) string { return path.Base(id) }
+
+// Resolve turns a command-line argument into a skill ID: an exact ID, or a
+// bare name that only one author uses.
+func (r Repo) Resolve(arg string) (string, error) {
+	if r.Has(arg) {
+		return arg, nil
+	}
+	ids, err := r.Names()
+	if err != nil {
+		return "", err
+	}
+	var matches []string
+	for _, id := range ids {
+		if !strings.Contains(arg, "/") && LinkName(id) == arg {
+			matches = append(matches, id)
+		}
+	}
+	switch len(matches) {
+	case 0:
+		return "", fmt.Errorf("no such skill: %s", arg)
+	case 1:
+		return matches[0], nil
+	}
+	return "", fmt.Errorf("ambiguous skill: %s (use one of: %s)", arg, strings.Join(matches, ", "))
+}
+
+// Source is the directory of the skill with this ID.
+func (r Repo) Source(id string) string { return filepath.Join(r.SrcDir, filepath.FromSlash(id)) }
 
 // Describe returns the first `description:` line of the skill's SKILL.md,
 // cut to 90 characters.

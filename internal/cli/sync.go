@@ -22,18 +22,25 @@ skills. No prompts.`,
 				return err
 			}
 			paths := skills.DefaultPaths()
+			p := newPrinter(cmd.OutOrStdout())
+			p.blank()
+			p.bold("Syncing links in " + paths.LinkDir + " and " + paths.ClaudeLinkDir)
+			migrated, err := links.Migrate(r, paths.LinkDirs())
+			for _, target := range migrated {
+				p.printf("  moved %s into its author folder\n", target)
+			}
+			if err != nil {
+				return err
+			}
 			entries, err := skills.LoadStates(r, paths)
 			if err != nil {
 				return err
 			}
-			p := newPrinter(cmd.OutOrStdout())
-			p.blank()
-			p.bold("Syncing links in " + paths.LinkDir + " and " + paths.ClaudeLinkDir)
 			for _, e := range entries {
 				if e.State == skills.Off {
 					continue
 				}
-				blocked, err := links.Link(r.Source(e.Name), e.Name, paths.LinkDirs(), p.warn)
+				blocked, err := links.Link(r.Source(e.Name), skills.LinkName(e.Name), paths.LinkDirs(), p.warn)
 				if err != nil {
 					return err
 				}
@@ -48,7 +55,7 @@ skills. No prompts.`,
 			if err != nil {
 				return err
 			}
-			if err := settings.WriteOverrides(paths.Settings, overrides(entries)); err != nil {
+			if err := settings.WriteOverrides(paths.Settings, skills.Overrides(entries)); err != nil {
 				return err
 			}
 			p.list(r, paths, entries)

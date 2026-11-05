@@ -6,14 +6,14 @@ The shared renderer every skill uses to show a result as a page: one Markdown fi
 ./artifact/render findings.md --title "Which Node is LTS?" --eyebrow "Web research"
 ```
 
-`./artifact/render --help` lists every flag. It needs Python 3 and a one-time `pnpm install` in this repo. The renderer (Marked, sanitised by DOMPurify) and the [Geist](../skills/geist/SKILL.md) token and type CSS are embedded in the output, so the page works offline in light and dark themes. Read the Geist skill before changing [`page.html`](page.html).
+`./artifact/render --help` lists every flag. It needs Python 3 and a one-time `pnpm install` in this repo. The renderer (Marked, sanitised by DOMPurify) and the [Geist](../skills/jorden/geist/SKILL.md) token and type CSS are embedded in the output, so the page works offline in light and dark themes. Read the Geist skill before changing [`page.html`](page.html).
 
 ## Giving a skill the artifact
 
 A skill is reached through its Link, so it cannot see this directory by path. Give it a relative symlink to the command instead:
 
 ```sh
-ln -s ../../artifact/render skills/<name>/artifact
+ln -s ../../../artifact/render skills/<author>/<name>/artifact
 ```
 
 Then, in the skill's `SKILL.md`, have the agent write its result to a Markdown file and run `<skill-directory>/artifact <file> --title "<title>" --eyebrow "<what kind of page this is>"`. State the flags the skill needs and leave the rest to `--help`.

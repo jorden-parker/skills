@@ -11,11 +11,19 @@ A directory containing a `SKILL.md`, holding instructions an agent loads on dema
 _Avoid_: command, plugin, prompt
 
 **Skills Directory**:
-The `skills/` folder in this repo. The authoritative copy of every skill.
+The `skills/` folder in this repo, grouped by Author. The authoritative copy of every skill.
 _Avoid_: library, catalogue
 
+**Author**:
+Whoever wrote a Skill, and the folder it lives in: `skills/<author>/<name>/`. A Skill's ID is `author/name`.
+_Avoid_: owner, source, vendor
+
+**Link name**:
+The last segment of a Skill's ID, and the name its Link takes. Skills by different Authors may share a Link name; only one of them can be linked at a time.
+_Avoid_: alias, slug
+
 **Link**:
-The symlink from a machine's `~/.agents/skills/<name>` back into the Skills Directory. A skill is _installed_ when its Link exists.
+The symlink from a machine's `~/.agents/skills/<link name>` back into the Skills Directory. A skill is _installed_ when its Link exists and points at it rather than at a same-name sibling.
 _Avoid_: install, copy, deploy
 
 **State**:
